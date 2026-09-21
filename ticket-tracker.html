@@ -1,0 +1,2953 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Team Ticket Tracker</title>
+<!-- SheetJS for Excel parsing -->
+<script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f0f2f5;--surface:#fff;--border:#dde1e7;--text:#1c1f26;--muted:#6b7280;
+  --accent:#2563eb;--accent-light:#eff6ff;
+  --green:#16a34a;--green-light:#f0fdf4;
+  --red:#dc2626;--red-light:#fef2f2;
+  --orange:#d97706;--orange-light:#fffbeb;
+  --purple:#7c3aed;--purple-light:#f3e8ff;
+  --radius:8px;--shadow:0 1px 3px rgba(0,0,0,.08);
+}
+body{font-family:-apple-system,"Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5}
+
+/* Layout */
+#app{display:flex;min-height:100vh}
+nav{width:220px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto}
+.nav-brand{padding:14px 16px 12px;font-weight:700;font-size:15px;color:var(--accent);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+/* Type selector */
+.type-tabs{display:flex;flex-direction:column;padding:8px 10px;gap:4px;border-bottom:1px solid var(--border);background:var(--bg)}
+.type-tab{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:6px;cursor:pointer;font-size:12.5px;font-weight:600;color:var(--muted);transition:all .15s;user-select:none;border:1.5px solid transparent}
+.type-tab:hover{background:var(--surface);color:var(--text)}
+.type-tab.active{background:var(--surface);border-color:var(--border);color:var(--text)}
+.type-tab .tt-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.type-tab.active .tt-dot{box-shadow:0 0 0 2px #fff,0 0 0 3.5px currentColor}
+.type-tab .tt-count{margin-left:auto;font-size:11px;font-weight:700;background:var(--border);color:var(--muted);border-radius:8px;padding:1px 6px;min-width:18px;text-align:center}
+.type-tab.active .tt-count{background:var(--accent);color:#fff}
+.type-label{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding:6px 10px 2px}
+.nav-links{flex:1;padding:8px 0}
+.nav-link{display:flex;align-items:center;gap:10px;padding:9px 16px;color:var(--muted);cursor:pointer;border-left:3px solid transparent;transition:all .15s;font-size:13.5px;user-select:none}
+.nav-link:hover{background:var(--bg);color:var(--text)}
+.nav-link.active{color:var(--accent);background:var(--accent-light);border-left-color:var(--accent);font-weight:600}
+.nav-link .nbadge{margin-left:auto;background:var(--accent);color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;min-width:20px;text-align:center}
+main{flex:1;padding:28px 32px;overflow-y:auto;min-width:0}
+
+/* Pages */
+.page{display:none}.page.active{display:block}
+.page-header{margin-bottom:22px}
+.page-header h1{font-size:20px;font-weight:700}
+.page-header p{color:var(--muted);margin-top:3px;font-size:13.5px}
+
+/* Cards */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);margin-bottom:18px}
+.card-title{font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:14px}
+
+/* Stat grid */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:20px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow)}
+.stat-card .val{font-size:30px;font-weight:700;line-height:1;margin-bottom:3px}
+.stat-card .lbl{color:var(--muted);font-size:12.5px}
+.blue .val{color:var(--accent)}.green .val{color:var(--green)}.orange .val{color:var(--orange)}.purple .val{color:var(--purple)}
+/* Manual breakdown table */
+.breakdown-table{width:100%;border-collapse:collapse;font-size:13px}
+.breakdown-table th{text-align:left;padding:8px 12px;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);background:var(--bg);border-bottom:1px solid var(--border)}
+.breakdown-table td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top}
+.breakdown-table tr:last-child td{border-bottom:none}
+.breakdown-table tr:hover td{background:var(--accent-light)}
+.bd-ids{display:flex;flex-wrap:wrap;gap:4px}
+.bd-id{display:inline-block;padding:1px 7px;border-radius:8px;font-size:11.5px;font-weight:600;background:var(--accent-light);color:var(--accent);cursor:pointer}
+.bd-id:hover{background:var(--accent);color:#fff}
+.bd-bar{height:6px;border-radius:3px;background:var(--accent);margin-top:4px}
+.ms-none-row td{color:var(--muted);font-style:italic}
+/* Performers leaderboard */
+.perf-tabs{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:16px}
+.perf-tab{padding:8px 18px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s;user-select:none}
+.perf-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.perf-tab:hover:not(.active){color:var(--text)}
+.perf-board{width:100%;border-collapse:collapse;font-size:13px}
+.perf-board th{text-align:left;padding:7px 12px;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);background:var(--bg);border-bottom:1px solid var(--border)}
+.perf-board td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+.perf-board tr:last-child td{border-bottom:none}
+.perf-board tr:hover td{background:var(--accent-light)}
+.perf-rank{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;font-weight:700;font-size:12px}
+.perf-rank.r1{background:#fef9c3;color:#92400e}
+.perf-rank.r2{background:#f1f5f9;color:#334155}
+.perf-rank.r3{background:#fff7ed;color:#c2410c}
+.perf-rank.rn{background:var(--bg);color:var(--muted)}
+.perf-bar-wrap{display:flex;align-items:center;gap:8px}
+.perf-bar-track{flex:1;background:var(--bg);border-radius:4px;height:10px;overflow:hidden;min-width:60px}
+.perf-bar-fill{height:100%;border-radius:4px;background:var(--accent);transition:width .4s}
+
+/* Charts */
+.charts-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px}
+.bar-chart{display:flex;flex-direction:column;gap:8px}
+.bar-row{display:flex;align-items:center;gap:10px;font-size:13px}
+.bar-label{width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0}
+.bar-track{flex:1;background:var(--bg);border-radius:4px;height:14px;overflow:hidden}
+.bar-fill{height:100%;border-radius:4px;transition:width .4s}
+.bar-count{width:30px;text-align:right;color:var(--muted);font-size:12px}
+
+/* Upload zone */
+.upload-zone{border:2px dashed var(--border);border-radius:var(--radius);padding:40px;text-align:center;cursor:pointer;transition:all .2s;background:var(--surface)}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--accent);background:var(--accent-light)}
+.upload-zone svg{color:var(--muted);margin-bottom:10px}
+.upload-zone p{color:var(--muted)}
+#file-input{display:none}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:6px;border:none;cursor:pointer;font-size:13.5px;font-weight:500;transition:opacity .15s;white-space:nowrap}
+.btn:hover{opacity:.85}.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-secondary{background:var(--bg);color:var(--text);border:1px solid var(--border)}
+.btn-sm{padding:5px 11px;font-size:12.5px}
+
+/* Toolbar */
+.toolbar{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.search-input{flex:1;min-width:180px;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:13.5px;outline:none;transition:border-color .15s}
+.search-input:focus{border-color:var(--accent)}
+select.filter{padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13.5px;background:var(--surface);outline:none}
+
+/* Column picker */
+.col-picker-wrap{position:relative}
+.col-picker-panel{display:none;position:absolute;top:calc(100% + 6px);right:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 4px 16px rgba(0,0,0,.12);padding:12px 14px;min-width:190px;z-index:50}
+.col-picker-panel.open{display:block}
+.col-picker-title{font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:8px}
+.col-picker-item{display:flex;align-items:center;gap:8px;padding:5px 2px;font-size:13.5px;cursor:pointer;border-radius:4px;user-select:none}
+.col-picker-item:hover{background:var(--bg)}
+.col-picker-item input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:var(--accent)}
+/* hidden column style */
+#active-table .col-hidden{display:none}
+
+/* Table */
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{text-align:left;padding:10px 12px;font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);background:var(--bg);border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--accent-light)}
+.empty-row td{text-align:center;color:var(--muted);padding:36px;font-size:13.5px}
+/* inline status */
+.status-select{padding:3px 7px;border:1px solid var(--border);border-radius:5px;font-size:12.5px;background:var(--surface);cursor:pointer;max-width:160px}
+.status-select:focus{outline:none;border-color:var(--accent)}
+.status-select.dirty{border-color:var(--orange);background:var(--orange-light)}
+.btn-save-inline{padding:3px 9px;font-size:11.5px;border-radius:5px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-weight:600;white-space:nowrap}
+.btn-save-inline:hover{opacity:.85}
+
+/* Badges */
+.bp{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11.5px;font-weight:600}
+.pc,.pu{background:#fee2e2;color:#b91c1c}.ph{background:#ffedd5;color:#c2410c}
+.pm{background:#fef9c3;color:#92400e}.pl{background:#dcfce7;color:#166534}.pd{background:#f3f4f6;color:#374151}
+.bs{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11.5px;font-weight:600}
+.so,.sn{background:#dbeafe;color:#1d4ed8}.sip{background:#fef3c7;color:#92400e}
+.sp,.sh{background:#f3e8ff;color:#6d28d9}.sr,.sc,.sd{background:#d1fae5;color:#065f46}.sd2{background:#f3f4f6;color:#374151}
+
+/* Modal */
+.modal-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;align-items:center;justify-content:center}
+.modal-backdrop.open{display:flex}
+.modal{background:var(--surface);border-radius:var(--radius);padding:26px;width:580px;max-width:96vw;max-height:90vh;overflow-y:auto;position:relative;box-shadow:0 20px 60px rgba(0,0,0,.18)}
+.modal-title{font-size:17px;font-weight:700;margin-bottom:16px}
+.modal-close{position:absolute;top:14px;right:16px;background:none;border:none;cursor:pointer;font-size:20px;color:var(--muted);line-height:1}
+
+/* Summary */
+.sum-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.si{border-radius:6px;padding:14px 16px}.si .sv{font-size:26px;font-weight:700;line-height:1}.si .sl{font-size:12px;color:var(--muted);margin-top:2px}
+.si-a{background:var(--green-light)}.si-a .sv{color:var(--green)}
+.si-u{background:var(--accent-light)}.si-u .sv{color:var(--accent)}
+.si-s{background:#f9fafb}.si-s .sv{color:var(--muted)}
+.si-r{background:var(--orange-light)}.si-r .sv{color:var(--orange)}
+.si-e{background:var(--red-light)}.si-e .sv{color:var(--red)}
+.si-t{background:var(--purple-light)}.si-t .sv{color:var(--purple)}
+
+/* Mapper */
+.mapper-tbl{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:18px}
+.mapper-tbl th{padding:8px 10px;background:var(--bg);color:var(--muted);font-weight:600;font-size:12px;text-align:left}
+.mapper-tbl td{padding:6px 10px;border-bottom:1px solid var(--border)}
+.mapper-tbl select{width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:5px;font-size:13px}
+
+/* History */
+.h-item{background:var(--bg);border-radius:6px;padding:12px 16px;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.h-name{font-weight:600;font-size:13.5px}.h-date{color:var(--muted);font-size:12px;margin-top:1px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font-size:11.5px;padding:2px 8px;border-radius:10px;font-weight:600}
+.cg{background:var(--green-light);color:var(--green)}.cb{background:var(--accent-light);color:var(--accent)}
+.co{background:var(--orange-light);color:var(--orange)}.cr{background:var(--red-light);color:var(--red)}.cgr{background:#f3f4f6;color:var(--muted)}
+
+/* Sortable headers */
+th.sortable{cursor:pointer;user-select:none;white-space:nowrap}
+th.sortable:hover{color:var(--text)}
+.sort-icon{display:inline-block;margin-left:4px;opacity:.4;font-size:10px;vertical-align:middle}
+th.sort-asc .sort-icon::after{content:'▲';opacity:1}
+th.sort-desc .sort-icon::after{content:'▼';opacity:1}
+th.sort-asc .sort-icon,th.sort-desc .sort-icon{opacity:1;color:var(--accent)}
+
+/* Inline status editor */
+.status-select{padding:3px 6px;border:1px solid var(--border);border-radius:5px;font-size:12px;background:var(--surface);cursor:pointer;width:100%}
+.status-select:focus{outline:none;border-color:var(--accent)}
+.status-select.dirty{border-color:var(--orange);background:var(--orange-light)}
+.btn-save-inline{padding:3px 9px;font-size:11.5px;border-radius:5px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-weight:600;white-space:nowrap}
+.btn-save-inline:hover{opacity:.85}
+/* Comments */
+.comment-cell{min-width:200px}
+.comment-display{font-size:12.5px;color:var(--text);margin-bottom:5px;white-space:pre-wrap;word-break:break-word;line-height:1.45}
+.comment-display.empty{color:var(--muted);font-style:italic}
+.comment-input{width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:5px;font-size:12.5px;font-family:inherit;resize:vertical;min-height:46px;line-height:1.4;transition:border-color .15s}
+.comment-input:focus{outline:none;border-color:var(--accent)}
+.comment-input.dirty{border-color:var(--orange)}
+.comment-actions{display:flex;gap:5px;margin-top:4px;align-items:center}
+.btn-comment-save{padding:2px 9px;font-size:11.5px;border-radius:5px;border:none;background:var(--green);color:#fff;cursor:pointer;font-weight:600}
+.btn-comment-save:hover{opacity:.85}
+.comment-toggle{font-size:11px;color:var(--accent);cursor:pointer;background:none;border:none;padding:0;text-decoration:underline}
+.prev-status-wrap{display:flex;flex-direction:column;gap:3px}
+.prev-entry{display:flex;align-items:baseline;gap:5px;font-size:11.5px}
+.prev-entry .ps-val{display:inline-block;padding:1px 6px;border-radius:8px;font-weight:600;background:#fef9c3;color:#92400e;white-space:nowrap}
+.prev-entry .ps-date{color:var(--muted);font-size:10.5px;white-space:nowrap}
+.prev-none{color:var(--muted);font-size:12px}
+
+/* Spinner */
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Toast */
+#toast{position:fixed;bottom:22px;right:22px;background:#1c1f26;color:#fff;padding:11px 16px;border-radius:8px;font-size:13.5px;transform:translateY(70px);opacity:0;transition:all .3s;z-index:200;max-width:320px}
+#toast.show{transform:translateY(0);opacity:1}
+#toast.err{background:var(--red)}#toast.ok{background:var(--green)}
+
+/* Detail */
+.dr{display:flex;gap:8px;margin-bottom:10px}
+.dl{width:120px;flex-shrink:0;font-weight:600;color:var(--muted);font-size:12.5px;padding-top:2px}
+.dv{flex:1}
+.dinput{width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:5px;font-size:13.5px;font-family:inherit}
+.dinput:focus{outline:none;border-color:var(--accent)}
+
+/* Selected file bar */
+.file-bar{display:none;margin-top:12px;padding:10px 14px;background:var(--accent-light);border-radius:6px;align-items:center;gap:10px}
+.file-bar.show{display:flex}
+
+@media(max-width:700px){
+  nav{width:52px}.nav-brand span,.nav-link span,.nbadge{display:none}
+  .nav-link{justify-content:center;padding:12px}
+  main{padding:16px 12px}.charts-row{grid-template-columns:1fr}
+  .sum-grid{grid-template-columns:1fr}
+}
+
+/* ── Role-based UI restrictions ── */
+/* Viewer: hide all action buttons except View & comment Save */
+body.role-viewer .btn-save-inline,
+body.role-viewer .status-select,
+body.role-viewer #bulk-bar,
+body.role-viewer .col-picker-wrap,
+body.role-viewer [onclick*="openMailCompose"],
+body.role-viewer #btn-save-detail,
+body.role-viewer #btn-send-mail { display:none !important; }
+
+body.role-viewer .dinput[data-key]:not([data-key="description"]) { pointer-events:none; background:var(--bg); color:var(--muted); }
+
+/* Manager: can edit manual status inline, but not bulk/detail-save */
+body.role-manager #bulk-bar,
+body.role-manager #btn-save-detail { display:none !important; }
+
+/* Clear All button — admin only */
+body.role-viewer  [onclick*="clearAll"],
+body.role-manager [onclick*="clearAll"] { display:none !important; }
+
+/* Resolved tab & Assignee Workload — admin only */
+body.role-viewer  .nav-link[data-page="resolved"],
+body.role-manager .nav-link[data-page="resolved"],
+body.role-viewer  #card-assignee-workload,
+body.role-manager #card-assignee-workload { display:none !important; }
+
+/* Summary stat cards & Activity trend — admin only */
+body.role-viewer  #card-summary-stats,
+body.role-manager #card-summary-stats,
+body.role-viewer  #card-activity-trend,
+body.role-manager #card-activity-trend { display:none !important; }
+
+/* Ownership card — "+ Add Person" button hidden for non-admin */
+body.role-viewer  #btn-add-owner,
+body.role-manager #btn-add-owner { display:none !important; }
+</style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════════
+     LOGIN SCREEN
+════════════════════════════════════════════ -->
+<div id="login-screen" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:40px 44px;width:380px;max-width:94vw;box-shadow:0 8px 40px rgba(0,0,0,.12);text-align:center">
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" style="margin-bottom:12px"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h5"/></svg>
+    <div style="font-size:20px;font-weight:700;color:var(--text);margin-bottom:4px">Team Ticket Tracker</div>
+    <div style="font-size:13.5px;color:var(--muted);margin-bottom:28px">Enter your PIN to continue</div>
+    <input id="login-pin" type="password" maxlength="20" placeholder="Enter PIN…"
+      style="width:100%;padding:11px 14px;border:2px solid var(--border);border-radius:8px;font-size:15px;text-align:center;letter-spacing:4px;outline:none;margin-bottom:10px;transition:border-color .15s"
+      onkeydown="if(event.key==='Enter')doLogin()"
+      onfocus="this.style.borderColor='var(--accent)'"
+      onblur="this.style.borderColor='var(--border)'"/>
+    <div id="login-err" style="color:var(--red);font-size:13px;min-height:18px;margin-bottom:10px"></div>
+    <button onclick="doLogin()"
+      style="width:100%;padding:11px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer">
+      Sign In
+    </button>
+    <div style="margin-top:20px;font-size:12px;color:var(--muted)">Contact your admin if you don't have a PIN.</div>
+  </div>
+</div>
+
+<div id="app">
+
+<!-- Sidebar -->
+<nav>
+  <div class="nav-brand" style="flex-direction:column;align-items:flex-start;gap:4px">
+    <div style="display:flex;align-items:center;gap:8px;width:100%">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h5"/></svg>
+      <span>Ticket Tracker</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;width:100%">
+      <span id="role-badge" style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;text-transform:uppercase;letter-spacing:.05em"></span>
+      <button id="logout-btn" onclick="doLogout()" title="Sign out"
+        style="margin-left:auto;font-size:11px;padding:2px 8px;border:1px solid var(--border);border-radius:5px;background:transparent;color:var(--muted);cursor:pointer;display:none">
+        Sign out
+      </button>
+    </div>
+  </div>
+  <!-- Ticket Type Selector -->
+  <div class="type-label">Ticket Type</div>
+  <div class="type-tabs" id="type-tabs">
+    <div class="type-tab active" data-type="incident" onclick="switchType('incident')">
+      <span class="tt-dot" style="background:#2563eb;color:#2563eb"></span>
+      <span>Incidents</span>
+      <span class="tt-count" id="tc-incident">0</span>
+    </div>
+    <div class="type-tab" data-type="problem" onclick="switchType('problem')">
+      <span class="tt-dot" style="background:#dc2626;color:#dc2626"></span>
+      <span>Problems</span>
+      <span class="tt-count" id="tc-problem">0</span>
+    </div>
+    <div class="type-tab" data-type="change" onclick="switchType('change')">
+      <span class="tt-dot" style="background:#d97706;color:#d97706"></span>
+      <span>Changes</span>
+      <span class="tt-count" id="tc-change">0</span>
+    </div>
+    <div class="type-tab" data-type="service_request" onclick="switchType('service_request')">
+      <span class="tt-dot" style="background:#7c3aed;color:#7c3aed"></span>
+      <span>Service Requests</span>
+      <span class="tt-count" id="tc-service_request">0</span>
+    </div>
+  </div>
+  <div class="nav-links">
+    <div class="nav-link active" data-page="dashboard">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      <span>Dashboard</span>
+    </div>
+    <div class="nav-link" data-page="active">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      <span>Active Tickets</span>
+      <span class="nbadge" id="nav-count">0</span>
+    </div>
+    <div class="nav-link" data-page="resolved">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      <span>Resolved</span>
+    </div>
+    <div class="nav-link" data-page="upload">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      <span>Upload Excel</span>
+    </div>
+    <div class="nav-link" data-page="history">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      <span>Upload History</span>
+    </div>
+    <div class="nav-link" data-page="download">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      <span>Download Excel</span>
+    </div>
+  </div>
+</nav>
+
+<main>
+
+  <!-- Dashboard -->
+  <div class="page active" id="page-dashboard">
+    <div class="page-header">
+      <h1 id="dash-title">Dashboard</h1>
+      <p id="dash-subtitle">Team workload overview &amp; ticket statistics</p>
+    </div>
+
+    <!-- All Types Overview (always visible) -->
+    <div class="card" style="margin-bottom:18px">
+      <div class="card-title" style="margin-bottom:12px">All Types — Active Ticket Overview</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden" id="all-types-grid">
+        <div style="padding:14px 16px;border-right:1px solid var(--border);cursor:pointer" onclick="switchType('incident')">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+            <span style="width:10px;height:10px;border-radius:50%;background:#2563eb;display:inline-block;flex-shrink:0"></span>
+            <span style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#2563eb">Incidents</span>
+          </div>
+          <div style="font-size:30px;font-weight:700;color:#2563eb;line-height:1" id="ato-incident-active">0</div>
+          <div style="font-size:11.5px;color:var(--muted);margin-top:3px">active · <span id="ato-incident-resolved" style="color:var(--green)">0</span> resolved</div>
+        </div>
+        <div style="padding:14px 16px;border-right:1px solid var(--border);cursor:pointer" onclick="switchType('problem')">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+            <span style="width:10px;height:10px;border-radius:50%;background:#dc2626;display:inline-block;flex-shrink:0"></span>
+            <span style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#dc2626">Problems</span>
+          </div>
+          <div style="font-size:30px;font-weight:700;color:#dc2626;line-height:1" id="ato-problem-active">0</div>
+          <div style="font-size:11.5px;color:var(--muted);margin-top:3px">active · <span id="ato-problem-resolved" style="color:var(--green)">0</span> resolved</div>
+        </div>
+        <div style="padding:14px 16px;border-right:1px solid var(--border);cursor:pointer" onclick="switchType('change')">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+            <span style="width:10px;height:10px;border-radius:50%;background:#d97706;display:inline-block;flex-shrink:0"></span>
+            <span style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#d97706">Changes</span>
+          </div>
+          <div style="font-size:30px;font-weight:700;color:#d97706;line-height:1" id="ato-change-active">0</div>
+          <div style="font-size:11.5px;color:var(--muted);margin-top:3px">active · <span id="ato-change-resolved" style="color:var(--green)">0</span> resolved</div>
+        </div>
+        <div style="padding:14px 16px;cursor:pointer" onclick="switchType('service_request')">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+            <span style="width:10px;height:10px;border-radius:50%;background:#7c3aed;display:inline-block;flex-shrink:0"></span>
+            <span style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#7c3aed">Svc Requests</span>
+          </div>
+          <div style="font-size:30px;font-weight:700;color:#7c3aed;line-height:1" id="ato-service_request-active">0</div>
+          <div style="font-size:11.5px;color:var(--muted);margin-top:3px">active · <span id="ato-service_request-resolved" style="color:var(--green)">0</span> resolved</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="stat-grid" id="card-summary-stats">
+      <div class="stat-card blue"><div class="val" id="s-active">0</div><div class="lbl">Active Tickets</div></div>
+      <div class="stat-card green"><div class="val" id="s-resolved">0</div><div class="lbl">Resolved / Archived</div></div>
+      <div class="stat-card orange"><div class="val" id="s-high">0</div><div class="lbl">High / Critical</div></div>
+      <div class="stat-card purple"><div class="val" id="s-unassigned">0</div><div class="lbl">Unassigned</div></div>
+      <div class="stat-card blue"><div class="val" id="s-manual-set">0</div><div class="lbl">Manual Status Set</div></div>
+      <div class="stat-card orange"><div class="val" id="s-manual-none">0</div><div class="lbl">Awaiting Manual Status</div></div>
+    </div>
+
+    <!-- Aging stat cards -->
+    <div style="margin-bottom:6px;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)">Ticket Aging</div>
+    <div class="stat-grid" style="margin-bottom:20px">
+      <div class="stat-card" style="border-top:3px solid #16a34a;cursor:pointer" onclick="goToAgingBand('green')" title="Filter active tickets: Fresh"><div class="val" id="s-age-green" style="color:#16a34a">0</div><div class="lbl">Fresh (0–6 days)</div></div>
+      <div class="stat-card" style="border-top:3px solid #ca8a04;cursor:pointer" onclick="goToAgingBand('yellow')" title="Filter active tickets: Ageing"><div class="val" id="s-age-yellow" style="color:#ca8a04">0</div><div class="lbl">Ageing (7–14 days)</div></div>
+      <div class="stat-card" style="border-top:3px solid #ea580c;cursor:pointer" onclick="goToAgingBand('orange')" title="Filter active tickets: Old"><div class="val" id="s-age-orange" style="color:#ea580c">0</div><div class="lbl">Old (15–30 days)</div></div>
+      <div class="stat-card" style="border-top:3px solid #dc2626;cursor:pointer" onclick="goToAgingBand('red')" title="Filter active tickets: Critical Age"><div class="val" id="s-age-red" style="color:#dc2626">0</div><div class="lbl">Critical Age (30+ days)</div></div>
+    </div>
+
+    <!-- Created vs Resolved trend card — Admin only -->
+    <div class="card" id="card-activity-trend" style="margin-bottom:18px">
+      <div class="card-title" style="margin-bottom:14px">Ticket Activity — Created &amp; Resolved</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+        <!-- Created -->
+        <div style="border-right:1px solid var(--border)">
+          <div style="padding:10px 16px;background:var(--bg);font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--accent);border-bottom:1px solid var(--border)">🆕 Tickets Created</div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);text-align:center">
+            <div style="padding:16px 8px;border-right:1px solid var(--border)">
+              <div style="font-size:28px;font-weight:700;color:var(--accent)" id="tc-created-7">0</div>
+              <div style="font-size:12px;color:var(--muted);margin-top:3px">Last 7 days</div>
+            </div>
+            <div style="padding:16px 8px;border-right:1px solid var(--border)">
+              <div style="font-size:28px;font-weight:700;color:var(--accent)" id="tc-created-14">0</div>
+              <div style="font-size:12px;color:var(--muted);margin-top:3px">Last 14 days</div>
+            </div>
+            <div style="padding:16px 8px">
+              <div style="font-size:28px;font-weight:700;color:var(--accent)" id="tc-created-30">0</div>
+              <div style="font-size:12px;color:var(--muted);margin-top:3px">Last 30 days</div>
+            </div>
+          </div>
+        </div>
+        <!-- Resolved -->
+        <div>
+          <div style="padding:10px 16px;background:var(--bg);font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--green);border-bottom:1px solid var(--border)">✅ Tickets Resolved</div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);text-align:center">
+            <div style="padding:16px 8px;border-right:1px solid var(--border)">
+              <div style="font-size:28px;font-weight:700;color:var(--green)" id="tc-resolved-7">0</div>
+              <div style="font-size:12px;color:var(--muted);margin-top:3px">Last 7 days</div>
+            </div>
+            <div style="padding:16px 8px;border-right:1px solid var(--border)">
+              <div style="font-size:28px;font-weight:700;color:var(--green)" id="tc-resolved-14">0</div>
+              <div style="font-size:12px;color:var(--muted);margin-top:3px">Last 14 days</div>
+            </div>
+            <div style="padding:16px 8px">
+              <div style="font-size:28px;font-weight:700;color:var(--green)" id="tc-resolved-30">0</div>
+              <div style="font-size:12px;color:var(--muted);margin-top:3px">Last 30 days</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Assignee Workload card — Admin only -->
+    <div class="card" id="card-assignee-workload" style="margin-bottom:18px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+        <div class="card-title" style="margin-bottom:0">👤 Assignee Workload — All Ticket Types</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <input id="aw-search" class="search-input" type="text" placeholder="Filter assignee…" style="width:180px;padding:5px 10px;font-size:13px" oninput="renderAssigneeWorkload()"/>
+          <label style="font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:5px;cursor:pointer">
+            <input type="checkbox" id="aw-active-only" checked onchange="renderAssigneeWorkload()" style="accent-color:var(--accent)"/> Active only
+          </label>
+        </div>
+      </div>
+      <div id="assignee-workload-wrap" style="overflow-x:auto"></div>
+    </div>
+
+    <div class="charts-row">
+      <div class="card"><div class="card-title">Tickets by Assignee (Top 10)</div><div class="bar-chart" id="ch-assignee"></div></div>
+      <div class="card"><div class="card-title">Top 10 Oldest Tickets</div><div id="ch-oldest"></div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Aging Breakdown</div>
+      <div id="aging-breakdown"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Manual Status Breakdown</div>
+      <div id="manual-breakdown"></div>
+    </div>
+    <!-- Ticket Ownership card — Incidents + Admin only -->
+    <div class="card" id="card-ownership" style="margin-bottom:18px;display:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+        <div>
+          <div class="card-title" style="margin-bottom:2px">🎯 Incident Ticket Ownership</div>
+          <div style="font-size:12px;color:var(--muted)">Target vs actual ticket distribution. Click % to edit (Admin only).</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span id="ownership-total-label" style="font-size:12.5px;color:var(--muted)"></span>
+          <button class="btn btn-secondary btn-sm" onclick="addOwnershipRow()" id="btn-add-owner">+ Add Person</button>
+        </div>
+      </div>
+      <div id="ownership-wrap" style="overflow-x:auto"></div>
+    </div>
+
+    <p id="last-upload-info" style="color:var(--muted);font-size:12.5px;margin-top:4px;"></p>
+  </div>
+
+  <!-- Active Tickets -->
+  <div class="page" id="page-active">
+    <div class="page-header"><h1 id="active-title">Active Tickets</h1><p id="active-subtitle">All open, in-progress, and pending tickets</p></div>
+    <div class="toolbar">
+      <input class="search-input" id="active-search" type="text" placeholder="Search by ID, title, or assignee…"/>
+      <select class="filter" id="f-priority">
+        <option value="">All Priorities</option>
+        <option>Critical</option><option>Urgent</option><option>High</option><option>Medium</option><option>Low</option>
+      </select>
+      <select class="filter" id="f-assignee"><option value="">All Assignees</option></select>
+      <select class="filter" id="f-manual-status">
+        <option value="">All Manual Statuses</option>
+      </select>
+      <select class="filter" id="f-age-band" onchange="renderActive()">
+        <option value="">All Ages</option>
+      </select>
+      <button class="btn btn-secondary btn-sm" onclick="clearActiveFilters()">✕ Clear</button>
+      <button class="btn btn-secondary btn-sm" onclick="renderActive()">↻ Refresh</button>
+      <div class="col-picker-wrap" id="col-picker-wrap">
+        <button class="btn btn-secondary btn-sm" onclick="toggleColPicker(event)" id="col-picker-btn">
+          ⚙ Columns
+        </button>
+        <div class="col-picker-panel" id="col-picker-panel">
+          <div class="col-picker-title">Show / Hide Columns</div>
+          <label class="col-picker-item"><input type="checkbox" data-col-idx="0" onchange="applyColVisibility()"> Ticket ID</label>
+          <label class="col-picker-item"><input type="checkbox" data-col-idx="1" onchange="applyColVisibility()"> Title</label>
+          <label class="col-picker-item"><input type="checkbox" data-col-idx="2" onchange="applyColVisibility()"> Priority</label>
+          <label class="col-picker-item"><input type="checkbox" data-col-idx="3" onchange="applyColVisibility()"> Excel Status</label>
+          <label class="col-picker-item"><input type="checkbox" data-col-idx="4" onchange="applyColVisibility()"> Manual Status</label>
+          <label class="col-picker-item"><input type="checkbox" data-col-idx="5" onchange="applyColVisibility()"> Previous Status</label>
+          <label class="col-picker-item"><input type="checkbox" data-col-idx="6" onchange="applyColVisibility()"> Comments</label>
+          <label class="col-picker-item"><input type="checkbox" data-col-idx="7" onchange="applyColVisibility()"> Assigned To</label>
+          <label class="col-picker-item"><input type="checkbox" data-col-idx="8" onchange="applyColVisibility()"> Short Description</label>
+          <label class="col-picker-item"><input type="checkbox" data-col-idx="9" onchange="applyColVisibility()"> Created</label>
+          <label class="col-picker-item"><input type="checkbox" data-col-idx="10" onchange="applyColVisibility()"> Aging (Days)</label>
+          <label class="col-picker-item"><input type="checkbox" data-col-idx="11" onchange="applyColVisibility()"> ETA</label>
+          <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);display:flex;gap:6px;">
+            <button class="btn btn-primary btn-sm" style="flex:1" onclick="showAllCols()">Show All</button>
+            <button class="btn btn-secondary btn-sm" style="flex:1" onclick="closeColPicker()">Done</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Bulk action bar — shown when ≥1 row selected -->
+    <div id="bulk-bar" style="display:none;align-items:center;gap:10px;flex-wrap:wrap;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:9px 14px;margin-bottom:10px">
+      <span id="bulk-count" style="font-weight:700;font-size:13px;color:var(--accent)">0 selected</span>
+      <span style="color:var(--border)">|</span>
+      <select id="bulk-status-sel" class="filter" style="padding:5px 8px;font-size:12.5px">
+        <option value="">Set Manual Status…</option>
+        <option>Open</option><option>In Progress</option><option>Pending</option>
+        <option>On Hold</option><option>Waiting for Info</option>
+        <option>Awaiting Confirmation from User</option><option>Can Be Closed Today</option>
+        <option>Corrective Change</option><option>Resolved</option><option>Closed</option>
+      </select>
+      <button class="btn btn-primary btn-sm" onclick="bulkApplyStatus()">✔ Apply to Selected</button>
+      <button class="btn btn-secondary btn-sm" onclick="bulkClear()">✕ Deselect All</button>
+    </div>
+
+    <div class="card table-wrap">
+      <table id="active-table">
+        <thead>
+          <tr>
+            <th style="width:32px;padding:8px 6px 8px 12px">
+              <input type="checkbox" id="chk-all" title="Select all" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent)" onchange="toggleSelectAll(this)"/>
+            </th>
+            <th class="sortable" data-col="ticket_id">Ticket ID<span class="sort-icon"></span></th>
+            <th class="sortable" data-col="title">Title<span class="sort-icon"></span></th>
+            <th class="sortable" data-col="priority">Priority<span class="sort-icon"></span></th>
+            <th class="sortable" data-col="status">Excel Status<span class="sort-icon"></span></th>
+            <th class="sortable" data-col="manual_status">Manual Status<span class="sort-icon"></span></th>
+            <th>Previous Status</th>
+            <th>Comments</th>
+            <th class="sortable" data-col="assigned_to">Assigned To<span class="sort-icon"></span></th>
+            <th class="sortable" data-col="short_description">Short Description<span class="sort-icon"></span></th>
+            <th class="sortable" data-col="created_date">Created<span class="sort-icon"></span></th>
+            <th class="sortable" data-col="_age">Aging (Days)<span class="sort-icon"></span></th>
+            <th class="sortable" data-col="eta">ETA<span class="sort-icon"></span></th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="active-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Resolved -->
+  <div class="page" id="page-resolved">
+    <div class="page-header"><h1 id="resolved-title">Resolved / Archived</h1><p id="resolved-subtitle">Tickets that have been resolved or closed</p></div>
+
+    <!-- Performers Leaderboard -->
+    <div class="card" style="margin-bottom:18px">
+      <div class="card-title" style="margin-bottom:12px">🏆 Performers Leaderboard — Resolved Tickets</div>
+      <div class="perf-tabs" id="perf-tabs">
+        <div class="perf-tab active" data-period="7"  onclick="switchPerfTab(7)">Last 1 Week</div>
+        <div class="perf-tab"        data-period="14" onclick="switchPerfTab(14)">Last 2 Weeks</div>
+        <div class="perf-tab"        data-period="30" onclick="switchPerfTab(30)">Last Month</div>
+      </div>
+      <div id="perf-board-wrap"></div>
+    </div>
+
+    <div class="toolbar">
+      <input class="search-input" id="resolved-search" type="text" placeholder="Search resolved tickets…"/>
+      <button class="btn btn-secondary btn-sm" onclick="renderResolved()">↻ Refresh</button>
+    </div>
+    <div class="card table-wrap">
+      <table><thead><tr>
+        <th>Ticket ID</th><th>Title</th><th>Priority</th><th>Status</th>
+        <th>Assigned To</th><th>Archived At</th><th></th>
+      </tr></thead>
+      <tbody id="resolved-tbody"></tbody></table>
+    </div>
+  </div>
+
+  <!-- Upload -->
+  <div class="page" id="page-upload">
+    <div class="page-header"><h1 id="upload-title">Upload Excel File</h1><p id="upload-subtitle">Upload your daily ticket export (.xlsx or .xls)</p></div>
+    <div id="mapping-warn" style="display:none;margin-bottom:14px;padding:11px 14px;background:#fffbeb;border:1px solid #fbbf24;border-radius:6px;font-size:13px;color:#92400e;">
+      ⚠️ Your saved mapping doesn't include <strong>Short Description</strong>. Please use <strong>Preview &amp; Map Columns</strong> once to update it, then all future uploads will work automatically.
+    </div>
+    <div class="card">
+      <div class="upload-zone" id="upload-zone">
+        <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        <p><strong>Click to select</strong> or drag &amp; drop your Excel file</p>
+        <p style="font-size:12px;margin-top:5px;">Supports .xlsx and .xls</p>
+        <input type="file" id="file-input" accept=".xlsx,.xls"/>
+      </div>
+      <div class="file-bar" id="file-bar">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <span id="file-name" style="font-weight:600;"></span>
+        <button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="clearFile()">✕ Remove</button>
+      </div>
+    </div>
+    <div id="upload-actions" style="display:none;gap:10px;flex-wrap:wrap;">
+      <button class="btn btn-primary" onclick="doPreview()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        Preview &amp; Map Columns
+      </button>
+      <button class="btn btn-secondary" onclick="doUploadDirect()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Upload with Saved Mapping
+      </button>
+    </div>
+    <div id="upload-status" style="margin-top:14px;"></div>
+  </div>
+
+  <!-- History -->
+  <div class="page" id="page-history">
+    <div class="page-header"><h1>Upload History</h1><p>Last 20 uploads with import summaries</p></div>
+    <div id="history-list"></div>
+    <div style="margin-top:16px;">
+      <button class="btn btn-secondary btn-sm" onclick="if(confirm('Clear ALL data including all tickets and history?')){clearAll()}">🗑 Clear All Data</button>
+    </div>
+  </div>
+
+  <!-- Download Excel -->
+  <div class="page" id="page-download">
+    <div class="page-header">
+      <h1>Download Excel</h1>
+      <p>Export all ticket data across all 4 categories into a single Excel file with 4 sheets</p>
+    </div>
+
+    <div class="card" style="max-width:560px">
+      <div class="card-title" style="margin-bottom:16px">Export Options</div>
+
+      <!-- Scope -->
+      <div style="margin-bottom:18px">
+        <div style="font-size:12.5px;font-weight:600;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em">Include Tickets</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <label style="display:flex;align-items:center;gap:8px;font-size:13.5px;cursor:pointer">
+            <input type="radio" name="dl-scope" value="active" checked style="accent-color:var(--accent)"/> Active tickets only
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13.5px;cursor:pointer">
+            <input type="radio" name="dl-scope" value="resolved" style="accent-color:var(--accent)"/> Resolved / Archived only
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13.5px;cursor:pointer">
+            <input type="radio" name="dl-scope" value="all" style="accent-color:var(--accent)"/> All tickets (active + resolved)
+          </label>
+        </div>
+      </div>
+
+      <!-- Sheet preview -->
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:12px 14px;margin-bottom:20px;font-size:13px">
+        <div style="font-weight:600;margin-bottom:8px;color:var(--muted);font-size:11.5px;text-transform:uppercase;letter-spacing:.04em">Sheets that will be generated</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;align-items:center;gap:8px"><span style="width:10px;height:10px;border-radius:2px;background:#2563eb;display:inline-block"></span><strong>Sheet 1 — Incidents</strong></div>
+          <div style="display:flex;align-items:center;gap:8px"><span style="width:10px;height:10px;border-radius:2px;background:#dc2626;display:inline-block"></span><strong>Sheet 2 — Problems</strong></div>
+          <div style="display:flex;align-items:center;gap:8px"><span style="width:10px;height:10px;border-radius:2px;background:#d97706;display:inline-block"></span><strong>Sheet 3 — Changes</strong></div>
+          <div style="display:flex;align-items:center;gap:8px"><span style="width:10px;height:10px;border-radius:2px;background:#7c3aed;display:inline-block"></span><strong>Sheet 4 — Service Requests</strong></div>
+        </div>
+        <div style="margin-top:10px;color:var(--muted);font-size:12px">Each sheet includes: Ticket ID, Title, Priority, Excel Status, Manual Status, Assigned To, Short Description, Created Date, Last Updated, ETA, Aging (Days), Resolved Date, Comments (latest)</div>
+      </div>
+
+      <div id="dl-counts" style="margin-bottom:18px;font-size:13px;color:var(--muted)"></div>
+
+      <button class="btn btn-primary" onclick="exportToExcel()" style="gap:8px">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Download Excel File
+      </button>
+    </div>
+  </div>
+
+</main>
+</div>
+
+<!-- Column Mapping Modal -->
+<div class="modal-backdrop" id="modal-mapper">
+  <div class="modal">
+    <div class="modal-title">Map Excel Columns</div>
+    <button class="modal-close" onclick="closeMapper()">✕</button>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:14px;">
+      Map each Excel column to a system field. <strong>ticket_id</strong> is required. Set unneeded columns to <em>— Skip —</em>.
+    </p>
+    <table class="mapper-tbl">
+      <thead><tr><th>Excel Column</th><th>Map to Field</th></tr></thead>
+      <tbody id="mapper-tbody"></tbody>
+    </table>
+    <div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;">
+      <button class="btn btn-secondary" onclick="closeMapper()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveMappingAndUpload()">Save Mapping &amp; Import</button>
+    </div>
+  </div>
+</div>
+
+<!-- Summary Modal -->
+<div class="modal-backdrop" id="modal-summary">
+  <div class="modal">
+    <div class="modal-title">✅ Import Complete</div>
+    <button class="modal-close" onclick="closeSummary()">✕</button>
+    <div class="sum-grid" id="sum-grid"></div>
+    <p style="color:var(--muted);font-size:12.5px;margin-bottom:16px;">Resolved tickets are archived and removed from the active dashboard.</p>
+    <div style="text-align:right;"><button class="btn btn-primary" onclick="closeSummary()">Done</button></div>
+  </div>
+</div>
+
+<!-- Ticket Detail Modal -->
+<div class="modal-backdrop" id="modal-ticket">
+  <div class="modal">
+    <div class="modal-title" id="detail-title">Ticket</div>
+    <button class="modal-close" onclick="closeDetail()">✕</button>
+    <div id="detail-body"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap;">
+      <button class="btn btn-secondary" onclick="closeDetail()">Close</button>
+      <button class="btn btn-secondary" id="btn-send-mail" onclick="openMailCompose()" style="color:#0369a1;border-color:#bae6fd;">
+        ✉️ Send Email
+      </button>
+      <button class="btn btn-primary" id="btn-save-detail" onclick="saveDetail()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Email Compose Modal -->
+<div class="modal-backdrop" id="modal-mail">
+  <div class="modal" style="width:640px">
+    <div class="modal-title">✉️ Send Email — Ticket Follow-up</div>
+    <button class="modal-close" onclick="closeMailCompose()">✕</button>
+    <div style="margin-bottom:12px;">
+      <label style="font-size:12.5px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px;">To (Recipient Email)</label>
+      <input id="mail-to" class="dinput" type="email" placeholder="assignee@company.com" style="margin-bottom:0"/>
+    </div>
+    <div style="margin-bottom:12px;">
+      <label style="font-size:12.5px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px;">CC (optional)</label>
+      <input id="mail-cc" class="dinput" type="email" placeholder="manager@company.com"/>
+    </div>
+    <div style="margin-bottom:12px;">
+      <label style="font-size:12.5px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px;">Subject</label>
+      <input id="mail-subject" class="dinput" type="text"/>
+    </div>
+    <div style="margin-bottom:16px;">
+      <label style="font-size:12.5px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px;">Message Body</label>
+      <textarea id="mail-body" class="dinput" rows="12" style="resize:vertical;line-height:1.6;font-size:13px"></textarea>
+    </div>
+    <div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px 14px;margin-bottom:16px;font-size:12.5px;color:var(--muted);line-height:1.6">
+      💡 Clicking <strong>Open in Mail Client</strong> will open your default email app (Outlook, Gmail desktop, Apple Mail, etc.) with everything pre-filled. You can review and send from there.
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;">
+      <button class="btn btn-secondary" onclick="closeMailCompose()">Cancel</button>
+      <button class="btn btn-secondary" onclick="copyMailBody()" style="color:#0369a1;border-color:#bae6fd;">📋 Copy Body</button>
+      <button class="btn btn-primary" onclick="sendMailTo()">✉️ Open in Mail Client</button>
+    </div>
+  </div>
+</div>
+
+<!-- Comment History Modal -->
+<div class="modal-backdrop" id="modal-comments">
+  <div class="modal">
+    <div class="modal-title" id="comment-modal-title">Comment History</div>
+    <button class="modal-close" onclick="closeCommentHistory()">✕</button>
+    <div id="comment-history-body"></div>
+    <div style="text-align:right;margin-top:16px;">
+      <button class="btn btn-primary" onclick="closeCommentHistory()">Close</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════
+//  ⚙  ROLE CONFIGURATION  — CHANGE PINS HERE
+// ══════════════════════════════════════════════
+const ROLE_PINS = {
+  admin:   '9623',   // ← change to your admin PIN
+  manager: '5678',   // ← change to your manager PIN
+  viewer:  '0000',   // ← change to your viewer PIN
+};
+
+// Role capabilities
+const ROLE_CAPS = {
+  admin:   { upload:true,  history:true,  reset:true,  edit:true,   comment:true,  resolved:true  },
+  manager: { upload:true,  history:false, reset:false, edit:true,   comment:true,  resolved:false },
+  viewer:  { upload:false, history:false, reset:false, edit:false,  comment:true,  resolved:false },
+};
+
+const ROLE_LABELS = {
+  admin:   { text:'Admin',   bg:'#dbeafe', color:'#1d4ed8' },
+  manager: { text:'Manager', bg:'#d1fae5', color:'#065f46' },
+  viewer:  { text:'Viewer',  bg:'#f3e8ff', color:'#6d28d9' },
+};
+
+const LS_ROLE = 'tt_role';  // stored in sessionStorage so it clears on browser close
+
+// ── Auth helpers ──
+function getRole()      { return sessionStorage.getItem(LS_ROLE) || null; }
+function setRole(r)     { sessionStorage.setItem(LS_ROLE, r); }
+function clearRole()    { sessionStorage.removeItem(LS_ROLE); }
+function can(cap)       { const r = getRole(); return r ? (ROLE_CAPS[r]?.[cap] ?? false) : false; }
+
+function doLogin() {
+  const pin = document.getElementById('login-pin').value;
+  const err = document.getElementById('login-err');
+  const role = Object.keys(ROLE_PINS).find(r => ROLE_PINS[r] === pin);
+  if (!role) {
+    err.textContent = 'Incorrect PIN. Please try again.';
+    document.getElementById('login-pin').value = '';
+    document.getElementById('login-pin').focus();
+    return;
+  }
+  setRole(role);
+  document.getElementById('login-screen').style.display = 'none';
+  applyRole();
+  switchType('incident');
+}
+
+function doLogout() {
+  clearRole();
+  document.getElementById('login-pin').value = '';
+  document.getElementById('login-err').textContent = '';
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('app').style.visibility = 'hidden';
+}
+
+function applyRole() {
+  const role = getRole();
+  if (!role) return;
+  const caps = ROLE_CAPS[role];
+  const lbl  = ROLE_LABELS[role];
+
+  // Show app, update badge
+  document.getElementById('app').style.visibility = 'visible';
+  const badge = document.getElementById('role-badge');
+  badge.textContent = lbl.text;
+  badge.style.background = lbl.bg;
+  badge.style.color = lbl.color;
+  document.getElementById('logout-btn').style.display = 'inline-block';
+
+  // ── Nav: hide Upload & History for non-admins/managers ──
+  const navUpload  = document.querySelector('.nav-link[data-page="upload"]');
+  const navHistory = document.querySelector('.nav-link[data-page="history"]');
+  if (navUpload)  navUpload.style.display  = caps.upload  ? '' : 'none';
+  if (navHistory) navHistory.style.display = caps.history ? '' : 'none';
+
+  // ── Viewer: disable all inline edits ──
+  // Applied via CSS class on <body> — no JS per-element needed
+  document.body.classList.toggle('role-viewer',  role === 'viewer');
+  document.body.classList.toggle('role-manager', role === 'manager');
+  document.body.classList.toggle('role-admin',   role === 'admin');
+}
+
+// ══════════════════════════════════════════════
+//  TICKET TYPE  (global state)
+// ══════════════════════════════════════════════
+const TICKET_TYPES = {
+  incident:        { label: 'Incidents',        color: '#2563eb' },
+  problem:         { label: 'Problems',          color: '#dc2626' },
+  change:          { label: 'Changes',           color: '#d97706' },
+  service_request: { label: 'Service Requests',  color: '#7c3aed' },
+};
+
+let currentType = 'incident';
+
+function typeLsKey(type, suffix) { return `tt_${type}_${suffix}`; }
+
+// ══════════════════════════════════════════════
+//  STORAGE  (per-type localStorage keys)
+// ══════════════════════════════════════════════
+const LS = {
+  get TICKETS() { return typeLsKey(currentType, 'tickets'); },
+  get MAPPING() { return typeLsKey(currentType, 'mapping'); },
+  get HISTORY() { return typeLsKey(currentType, 'history'); },
+};
+
+const RESOLVED_STATUSES = new Set(['resolved','closed','done','completed','fixed','cancelled','canceled']);
+
+const CORE_FIELDS = ['ticket_id','title','description','created_date','priority','assigned_to','category','status','last_updated','short_description'];
+
+const DEFAULT_GUESSES = {
+  'ticket id':'ticket_id','ticket number':'ticket_id','ticket_id':'ticket_id',
+  'ticketid':'ticket_id','id':'ticket_id','incident':'ticket_id','incident number':'ticket_id',
+  'no':'ticket_id','number':'ticket_id','ref':'ticket_id','reference':'ticket_id',
+  'title':'title','subject':'title','ticket title':'title','summary':'title',
+  'description':'description','details':'description','desc':'description',
+  'created date':'created_date','created_date':'created_date','creation date':'created_date',
+  'open date':'created_date','date created':'created_date','opened':'created_date',
+  'priority':'priority','severity':'priority','sev':'priority',
+  'assigned to':'assigned_to','assignee':'assigned_to','owner':'assigned_to','assigned_to':'assigned_to',
+  'engineer':'assigned_to','resolver':'assigned_to',
+  'category':'category','type':'category','ticket type':'category','group':'category','team':'category',
+  'short description':'short_description','short_description':'short_description','brief':'short_description','summary desc':'short_description',
+  'status':'status','state':'status','current status':'status','ticket status':'status',
+  'last updated':'last_updated','last_updated':'last_updated','updated date':'last_updated',
+  'modified date':'last_updated','update date':'last_updated',
+};
+
+function lsGet(key) { try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch { return null; } }
+function lsSet(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
+
+function getTickets() { return lsGet(LS.TICKETS) || {}; }
+function saveTickets(t) { lsSet(LS.TICKETS, t); }
+function getMapping() { return lsGet(LS.MAPPING) || {}; }
+function saveMapping(m) { lsSet(LS.MAPPING, m); }
+function getHistory() { return lsGet(LS.HISTORY) || []; }
+function addHistory(entry) {
+  const h = getHistory();
+  h.unshift(entry);
+  lsSet(LS.HISTORY, h.slice(0, 20));
+}
+
+function isResolved(status) {
+  return RESOLVED_STATUSES.has((status || '').trim().toLowerCase());
+}
+function nowISO() { return new Date().toISOString(); }
+
+// ══════════════════════════════════════════════
+//  NAVIGATION
+// ══════════════════════════════════════════════
+document.querySelectorAll('.nav-link').forEach(link => {
+  link.addEventListener('click', () => {
+    const page = link.dataset.page;
+    // Guard pages by capability
+    if (page === 'upload'   && !can('upload'))   { toast('Access denied — your role cannot upload files', 'err'); return; }
+    if (page === 'history'  && !can('history'))  { toast('Access denied — upload history is restricted', 'err'); return; }
+    if (page === 'resolved' && !can('resolved')) { toast('Access denied — resolved tickets are restricted to Admin', 'err'); return; }
+
+    document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    link.classList.add('active');
+    document.getElementById('page-' + page).classList.add('active');
+    if (page === 'dashboard') renderDashboard();
+    if (page === 'active')    renderActive();
+    if (page === 'resolved')  resolvedPageLoad();
+    if (page === 'history')   renderHistory();
+    if (page === 'upload')    checkMappingWarn();
+    if (page === 'download')  renderDownloadCounts();
+  });
+});
+
+// ══════════════════════════════════════════════
+//  TYPE SWITCHER
+// ══════════════════════════════════════════════
+function switchType(type) {
+  if (!TICKET_TYPES[type]) return;
+  currentType = type;
+
+  // Update sidebar type tabs
+  document.querySelectorAll('.type-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.type === type);
+  });
+
+  // Update all page headers with type label
+  const label = TICKET_TYPES[type].label;
+  const color = TICKET_TYPES[type].color;
+  const setEl = (id, txt) => { const e = document.getElementById(id); if (e) e.textContent = txt; };
+  setEl('dash-title',       `Dashboard — ${label}`);
+  setEl('dash-subtitle',    `Workload overview & statistics for ${label}`);
+  setEl('active-title',     `Active ${label}`);
+  setEl('active-subtitle',  `All open, in-progress, and pending ${label.toLowerCase()}`);
+  setEl('resolved-title',   `Resolved ${label}`);
+  setEl('resolved-subtitle',`${label} that have been resolved or closed`);
+  setEl('upload-title',     `Upload Excel — ${label}`);
+  setEl('upload-subtitle',  `Upload your daily ${label.toLowerCase()} export (.xlsx or .xls)`);
+
+  // Reset file selection when switching type
+  clearFile();
+
+  // Re-render the current active page
+  const activePage = document.querySelector('.nav-link.active')?.dataset.page;
+  if (activePage === 'dashboard') renderDashboard();
+  else if (activePage === 'active') renderActive();
+  else if (activePage === 'resolved') resolvedPageLoad();
+  else if (activePage === 'history') renderHistory();
+  else if (activePage === 'upload') checkMappingWarn();
+
+  refreshNavCount();
+}
+
+function updateTypeTabCounts() {
+  Object.keys(TICKET_TYPES).forEach(type => {
+    const tickets = lsGet(typeLsKey(type, 'tickets')) || {};
+    const active = Object.values(tickets).filter(t => !t.is_resolved).length;
+    const el = document.getElementById('tc-' + type);
+    if (el) el.textContent = active;
+  });
+}
+
+// ══════════════════════════════════════════════
+//  TOAST
+// ══════════════════════════════════════════════
+let toastT;
+function toast(msg, type='') {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.className = 'show ' + type;
+  clearTimeout(toastT); toastT = setTimeout(() => el.className = '', 3800);
+}
+
+// ══════════════════════════════════════════════
+//  FILE HANDLING
+// ══════════════════════════════════════════════
+let selectedFile = null;
+let parsedRows = null; // { headers, rows }
+
+const zone = document.getElementById('upload-zone');
+const fileInput = document.getElementById('file-input');
+
+zone.addEventListener('click', () => fileInput.click());
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('drag'));
+zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('drag'); if (e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]); });
+fileInput.addEventListener('change', e => { if (e.target.files[0]) setFile(e.target.files[0]); });
+
+function setFile(file) {
+  if (!/\.(xlsx|xls)$/i.test(file.name)) { toast('Please select an .xlsx or .xls file', 'err'); return; }
+  selectedFile = file;
+  parsedRows = null;
+  document.getElementById('file-name').textContent = file.name;
+  document.getElementById('file-bar').classList.add('show');
+  document.getElementById('upload-actions').style.display = 'flex';
+}
+
+function clearFile() {
+  selectedFile = null; parsedRows = null; fileInput.value = '';
+  document.getElementById('file-bar').classList.remove('show');
+  document.getElementById('upload-actions').style.display = 'none';
+  document.getElementById('upload-status').innerHTML = '';
+}
+
+// ══════════════════════════════════════════════
+//  EXCEL PARSING  (SheetJS)
+// ══════════════════════════════════════════════
+function parseExcel(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+        if (!raw.length) { reject('Empty file'); return; }
+        const headers = raw[0].map(h => String(h == null ? '' : h).trim());
+        const rows = raw.slice(1).map(r => {
+          const obj = {};
+          headers.forEach((h, i) => { obj[h] = r[i] == null ? '' : String(r[i]).trim(); });
+          return obj;
+        }).filter(r => Object.values(r).some(v => v !== ''));
+        resolve({ headers, rows });
+      } catch(err) { reject(err.message || String(err)); }
+    };
+    reader.onerror = () => reject('File read error');
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+// ══════════════════════════════════════════════
+//  PREVIEW / MAPPER
+// ══════════════════════════════════════════════
+async function doPreview() {
+  if (!selectedFile) return;
+  setStatus('<span class="spinner"></span> Reading file…');
+  try {
+    parsedRows = await parseExcel(selectedFile);
+    setStatus('');
+    openMapper(parsedRows.headers);
+  } catch(e) { toast('Could not read file: ' + e, 'err'); setStatus(''); }
+}
+
+function openMapper(headers) {
+  const saved = getMapping();
+  // Build a normalised version of saved mapping for case-insensitive lookup
+  const savedNorm = {};
+  Object.entries(saved).forEach(([col, field]) => { savedNorm[col.toLowerCase().trim()] = field; });
+  const tbody = document.getElementById('mapper-tbody');
+  tbody.innerHTML = '';
+  headers.forEach(h => {
+    const suggested = savedNorm[h.toLowerCase().trim()] || DEFAULT_GUESSES[h.toLowerCase().trim()] || '';
+    const opts = ['', ...CORE_FIELDS].map(f =>
+      `<option value="${f}" ${suggested === f ? 'selected' : ''}>${f || '— Skip —'}</option>`
+    ).join('');
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td><strong>${esc(h)}</strong></td><td><select data-col="${esc(h)}">${opts}</select></td>`;
+    tbody.appendChild(tr);
+  });
+  document.getElementById('modal-mapper').classList.add('open');
+}
+
+function closeMapper() { document.getElementById('modal-mapper').classList.remove('open'); }
+
+function saveMappingAndUpload() {
+  const mapping = {};
+  document.querySelectorAll('#mapper-tbody select').forEach(sel => {
+    if (sel.value) mapping[sel.dataset.col] = sel.value;
+  });
+  if (!Object.values(mapping).includes('ticket_id')) {
+    toast('You must map at least one column to "ticket_id"', 'err'); return;
+  }
+  saveMapping(mapping);
+  closeMapper();
+  checkMappingWarn();
+  runImport(parsedRows, mapping);
+}
+
+// ══════════════════════════════════════════════
+//  UPLOAD DIRECT (saved mapping)
+// ══════════════════════════════════════════════
+async function doUploadDirect() {
+  const mapping = getMapping();
+  if (!Object.keys(mapping).length || !Object.values(mapping).includes('ticket_id')) {
+    toast('No saved mapping found. Please use "Preview & Map Columns" first.', 'err'); return;
+  }
+  if (!parsedRows) {
+    setStatus('<span class="spinner"></span> Reading file…');
+    try { parsedRows = await parseExcel(selectedFile); setStatus(''); }
+    catch(e) { toast('Could not read file: ' + e, 'err'); setStatus(''); return; }
+  }
+  runImport(parsedRows, mapping);
+}
+
+// ══════════════════════════════════════════════
+//  CORE IMPORT LOGIC
+// ══════════════════════════════════════════════
+function runImport(parsed, mapping) {
+  setStatus('<span class="spinner"></span> Importing tickets…');
+  // Use setTimeout so the spinner actually renders before the sync loop
+  setTimeout(() => {
+    const tickets = getTickets();
+    const stats = { added: 0, updated: 0, skipped: 0, archived: 0, errors: 0, total: 0 };
+    const now = nowISO();
+    const filename = selectedFile ? selectedFile.name : 'unknown';
+
+    // Reverse mapping: field_name → excel_col (for lookup convenience)
+    // Actually we use forward mapping: excel_col → field_name
+    // Build a normalised lookup: lowercase-trimmed excel_col → field_name
+    // This makes matching robust against casing / spacing differences
+    const normMapping = {};
+    Object.entries(mapping).forEach(([col, field]) => {
+      normMapping[col.toLowerCase().trim()] = field;
+    });
+
+    parsed.rows.forEach(rawRow => {
+      stats.total++;
+      try {
+        const record = {};
+        const extra = {};
+        Object.entries(rawRow).forEach(([col, val]) => {
+          const field = normMapping[col.toLowerCase().trim()];
+          if (field && CORE_FIELDS.includes(field)) record[field] = val;
+          else extra[col] = val;
+        });
+        record._extra = extra;
+
+        const tid = (record.ticket_id || '').trim();
+        if (!tid) { stats.errors++; return; }
+
+        const resolved = isResolved(record.status);
+        const existing = tickets[tid];
+
+        if (!existing) {
+          // New ticket
+          tickets[tid] = {
+            ticket_id: tid,
+            title: record.title || '',
+            description: record.description || '',
+            created_date: record.created_date || '',
+            priority: record.priority || '',
+            assigned_to: record.assigned_to || '',
+            category: record.category || '',
+            short_description: record.short_description || '',
+            status: record.status || '',
+            last_updated: record.last_updated || '',
+            extra: extra,
+            is_resolved: resolved ? 1 : 0,
+            archived_at: resolved ? now : null,
+            resolved_date: resolved ? (record.last_updated || now) : null,
+            imported_at: now,
+          };
+          if (resolved) stats.archived++;
+          else stats.added++;
+        } else {
+          // Existing ticket — always update all fields from Excel
+          const oldStatus = (existing.status || '').trim().toLowerCase();
+          const newStatus = (record.status || '').trim().toLowerCase();
+          const statusChanged = oldStatus !== newStatus;
+
+          // Push manual_status into history before any overwrite
+          if (existing.manual_status) {
+            pushStatusHistory(existing, existing.manual_status, now);
+            existing.manual_status = '';
+          }
+
+          // Always overwrite every Excel-sourced field
+          if (record.title)             existing.title             = record.title;
+          if (record.description)       existing.description       = record.description;
+          if (record.created_date)      existing.created_date      = record.created_date;
+          if (record.priority)          existing.priority          = record.priority;
+          if (record.assigned_to)       existing.assigned_to       = record.assigned_to;
+          if (record.category)          existing.category          = record.category;
+          if (record.short_description) existing.short_description = record.short_description;
+          if (record.status)            existing.status            = record.status;
+          if (record.last_updated)      existing.last_updated      = record.last_updated;
+          existing.extra = extra;
+          existing.is_resolved = resolved ? 1 : 0;
+          existing.archived_at = resolved ? now : existing.archived_at;
+          existing.resolved_date = resolved ? (record.last_updated || existing.resolved_date || now) : existing.resolved_date;
+
+          if (resolved)           stats.archived++;
+          else if (statusChanged) stats.updated++;
+          else                    stats.skipped++;
+        }
+      } catch(e) { stats.errors++; }
+    });
+
+    saveTickets(tickets);
+    addHistory({ filename, at: now, ...stats });
+    setStatus('');
+    clearFile();
+    showSummary(stats);
+    refreshNavCount();
+    renderDashboard();
+  }, 50);
+}
+
+// ══════════════════════════════════════════════
+//  SUMMARY MODAL
+// ══════════════════════════════════════════════
+function showSummary(s) {
+  document.getElementById('sum-grid').innerHTML = [
+    { cls:'si-a', v:s.added,    l:'New Tickets Added' },
+    { cls:'si-u', v:s.updated,  l:'Existing Updated' },
+    { cls:'si-s', v:s.skipped,  l:'Unchanged / Skipped' },
+    { cls:'si-r', v:s.archived, l:'Resolved / Archived' },
+    { cls:'si-e', v:s.errors,   l:'Errors / Invalid Rows' },
+    { cls:'si-t', v:s.total,    l:'Total Rows Processed' },
+  ].map(i => `<div class="si ${i.cls}"><div class="sv">${i.v}</div><div class="sl">${i.l}</div></div>`).join('');
+  document.getElementById('modal-summary').classList.add('open');
+}
+function closeSummary() { document.getElementById('modal-summary').classList.remove('open'); }
+
+// ══════════════════════════════════════════════
+//  DASHBOARD
+// ══════════════════════════════════════════════
+function renderDashboard() {
+  // ── All Types overview card ──
+  Object.keys(TICKET_TYPES).forEach(type => {
+    const all = Object.values(lsGet(typeLsKey(type, 'tickets')) || {});
+    document.getElementById(`ato-${type}-active`).textContent   = all.filter(t => !t.is_resolved).length;
+    document.getElementById(`ato-${type}-resolved`).textContent = all.filter(t =>  t.is_resolved).length;
+  });
+  updateTypeTabCounts();
+
+  const tickets = Object.values(getTickets());
+  const active = tickets.filter(t => !t.is_resolved);
+  const resolved = tickets.filter(t => t.is_resolved);
+
+  document.getElementById('s-active').textContent = active.length;
+  document.getElementById('s-resolved').textContent = resolved.length;
+
+  const highCount = active.filter(t => ['critical','urgent','high'].includes((t.priority||'').toLowerCase())).length;
+  document.getElementById('s-high').textContent = highCount;
+
+  const unassigned = active.filter(t => !t.assigned_to || t.assigned_to.trim() === '').length;
+  document.getElementById('s-unassigned').textContent = unassigned;
+
+  // Manual status stats
+  const manualSet  = active.filter(t => (t.manual_status||'').trim() !== '');
+  const manualNone = active.filter(t => !(t.manual_status||'').trim());
+  document.getElementById('s-manual-set').textContent  = manualSet.length;
+  document.getElementById('s-manual-none').textContent = manualNone.length;
+
+  // By assignee
+  renderBar('ch-assignee', countBy(active, 'assigned_to', 'Unassigned', 10), '#16a34a');
+
+  // ── Aging stat cards — labels + counts driven by current type's config ──
+  const ageCfg = getAgingConfig();
+  const ageCounts = { green:0, yellow:0, orange:0, red:0 };
+  active.forEach(t => {
+    const band = ageBand(t);
+    if (ageCounts[band] !== undefined) ageCounts[band]++;
+  });
+  // Update counts
+  document.getElementById('s-age-green').textContent  = ageCounts.green;
+  document.getElementById('s-age-yellow').textContent = ageCounts.yellow;
+  document.getElementById('s-age-orange').textContent = ageCounts.orange;
+  document.getElementById('s-age-red').textContent    = ageCounts.red;
+  // Update stat card labels to match current type's thresholds
+  ageCfg.forEach(b => {
+    const card = document.getElementById('s-age-' + b.key);
+    if (card) {
+      const lbl = card.closest('.stat-card')?.querySelector('.lbl');
+      if (lbl) lbl.textContent = b.label;
+    }
+  });
+
+  // ── Created vs Resolved trend ──
+  const cutoff7  = new Date(); cutoff7.setHours(0,0,0,0);  cutoff7.setDate(cutoff7.getDate() - 7);
+  const cutoff14 = new Date(); cutoff14.setHours(0,0,0,0); cutoff14.setDate(cutoff14.getDate() - 14);
+  const cutoff30 = new Date(); cutoff30.setHours(0,0,0,0); cutoff30.setDate(cutoff30.getDate() - 30);
+
+  function countInPeriod(arr, dateFn, cutoff) {
+    return arr.filter(t => { const d = new Date(dateFn(t)); return !isNaN(d) && d >= cutoff; }).length;
+  }
+
+  // Created — use created_date, fall back to imported_at
+  const createdDate = t => t.created_date || t.imported_at || '';
+  document.getElementById('tc-created-7').textContent  = countInPeriod(tickets, createdDate, cutoff7);
+  document.getElementById('tc-created-14').textContent = countInPeriod(tickets, createdDate, cutoff14);
+  document.getElementById('tc-created-30').textContent = countInPeriod(tickets, createdDate, cutoff30);
+
+  // Resolved — use resolved_date (from Excel), fall back to archived_at
+  const resolvedDate = t => t.resolved_date || t.archived_at || '';
+  document.getElementById('tc-resolved-7').textContent  = countInPeriod(resolved, resolvedDate, cutoff7);
+  document.getElementById('tc-resolved-14').textContent = countInPeriod(resolved, resolvedDate, cutoff14);
+  document.getElementById('tc-resolved-30').textContent = countInPeriod(resolved, resolvedDate, cutoff30);
+
+  // ── Top 10 oldest tickets ──
+  renderOldestTickets(active);
+
+  // ── Aging breakdown table ──
+  renderAgingBreakdown(active);
+
+  // Manual status breakdown table
+  renderManualBreakdown(active);
+
+  // Assignee workload (cross-type)
+  renderAssigneeWorkload();
+
+  // Incident ownership (admin + incident type only)
+  renderOwnership();
+
+  // Last upload
+  const h = getHistory();
+  if (h.length) {
+    const lu = h[0];
+    document.getElementById('last-upload-info').textContent =
+      `Last upload: ${lu.filename} on ${new Date(lu.at).toLocaleString()} — ${lu.added} added, ${lu.updated} updated, ${lu.archived} archived`;
+  }
+
+  refreshNavCount(active.length);
+}
+
+// ══════════════════════════════════════════════
+//  INCIDENT TICKET OWNERSHIP
+// ══════════════════════════════════════════════
+const LS_OWNERSHIP = 'tt_ownership';
+
+const DEFAULT_OWNERSHIP = {
+  'Komesh Siva':    10,
+  'AN Somanna':     10,
+  'Mallikarjun N P':15,
+  'Vamsi Krishna':  15,
+  'Harika Sadhu':   25,
+  'Shubhaprada K':  25,
+};
+
+function getOwnership() {
+  return lsGet(LS_OWNERSHIP) || { ...DEFAULT_OWNERSHIP };
+}
+function saveOwnership(o) { lsSet(LS_OWNERSHIP, o); }
+
+function renderOwnership() {
+  const card = document.getElementById('card-ownership');
+  if (!card) return;
+
+  // Show for all roles on incidents tab; admin gets edit controls
+  const isAdmin = getRole() === 'admin';
+  const isIncident = currentType === 'incident';
+  card.style.display = isIncident ? '' : 'none';
+  if (!isIncident) return;
+
+  const ownership = getOwnership();
+  const allTickets = Object.values(getTickets()).filter(t => !t.is_resolved);
+  const total = allTickets.length;
+
+  // Count active tickets per assignee (case-insensitive match)
+  const actualMap = {};
+  allTickets.forEach(t => {
+    const name = (t.assigned_to || '').trim();
+    if (name) actualMap[name] = (actualMap[name] || 0) + 1;
+  });
+
+  // Total allocation check
+  const totalPct = Object.values(ownership).reduce((s, v) => s + (parseFloat(v) || 0), 0);
+  const lbl = document.getElementById('ownership-total-label');
+  if (lbl) {
+    lbl.textContent = `Total allocated: ${totalPct.toFixed(1)}%`;
+    lbl.style.color = Math.abs(totalPct - 100) < 0.1 ? 'var(--green)' : 'var(--orange)';
+  }
+
+  const rows = Object.entries(ownership).map(([name, pct]) => {
+    const target   = Math.round((parseFloat(pct) || 0) / 100 * total);
+    const actual   = actualMap[name] || 0;
+    const gap      = actual - target;  // negative = holding fewer than target
+    const gapLabel = gap === 0 ? '✔ On target'
+                   : gap > 0  ? `+${gap} over`
+                   : `${gap} short`;
+    const gapColor = gap === 0 ? 'var(--green)'
+                   : gap > 0  ? 'var(--green)'
+                   : 'var(--red)';
+    const barActual = total > 0 ? Math.min((actual / total) * 100, 100).toFixed(1) : 0;
+    const barTarget = total > 0 ? Math.min((target / total) * 100, 100).toFixed(1) : 0;
+
+    const targetPctCell = isAdmin
+      ? `<td style="padding:9px 12px;text-align:center">
+          <input type="number" min="0" max="100" step="0.5"
+            value="${parseFloat(pct).toFixed(1)}"
+            class="own-pct-input"
+            style="width:62px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;font-size:13px;font-weight:700;color:var(--accent);text-align:center;background:var(--surface)"
+            onchange="saveOwnershipPct('${esc(name)}', this.value)"
+            title="Click to edit target %"/>
+          <span style="font-size:11px;color:var(--muted)">%</span>
+        </td>`
+      : '';
+    const removeCell = isAdmin
+      ? `<td style="padding:9px 12px;text-align:center">
+          <button onclick="removeOwnershipRow('${esc(name)}')"
+            style="font-size:11px;padding:2px 8px;border:1px solid var(--border);border-radius:4px;background:transparent;color:var(--muted);cursor:pointer"
+            title="Remove">✕</button>
+        </td>`
+      : '';
+    return `<tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:9px 12px;font-weight:600">${esc(name)}</td>
+      ${targetPctCell}
+      <td style="padding:9px 12px;text-align:center;font-weight:700;font-size:15px;color:var(--accent)">${target}</td>
+      <td style="padding:9px 12px;text-align:center;font-weight:700;font-size:15px">${actual}</td>
+      <td style="padding:9px 12px;text-align:center;font-weight:700;color:${gapColor}">${gapLabel}</td>
+      <td style="padding:9px 12px;min-width:140px">
+        <div title="Target" style="margin-bottom:3px;display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)">
+          <span style="width:40px">Target</span>
+          <div style="flex:1;background:var(--bg);border-radius:3px;height:6px;overflow:hidden">
+            <div style="height:100%;width:${barTarget}%;background:#bfdbfe;border-radius:3px"></div>
+          </div>
+        </div>
+        <div title="Actual" style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)">
+          <span style="width:40px">Actual</span>
+          <div style="flex:1;background:var(--bg);border-radius:3px;height:6px;overflow:hidden">
+            <div style="height:100%;width:${barActual}%;background:${gapColor};border-radius:3px"></div>
+          </div>
+        </div>
+      </td>
+      ${removeCell}
+    </tr>`;
+  }).join('');
+
+  document.getElementById('ownership-wrap').innerHTML = total === 0
+    ? '<p style="color:var(--muted);font-size:13px">No active incidents to distribute.</p>'
+    : `<table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead><tr style="background:var(--bg)">
+          <th style="padding:7px 12px;text-align:left;border-bottom:1px solid var(--border);color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em">Assignee</th>
+          ${isAdmin ? '<th style="padding:7px 12px;text-align:center;border-bottom:1px solid var(--border);color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em">Target %</th>' : ''}
+          <th style="padding:7px 12px;text-align:center;border-bottom:1px solid var(--border);color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em">Target Tickets</th>
+          <th style="padding:7px 12px;text-align:center;border-bottom:1px solid var(--border);color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em">Holding Now</th>
+          <th style="padding:7px 12px;text-align:center;border-bottom:1px solid var(--border);color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em">Gap</th>
+          <th style="padding:7px 12px;text-align:left;border-bottom:1px solid var(--border);color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em">Distribution</th>
+          ${isAdmin ? '<th style="padding:7px 12px;border-bottom:1px solid var(--border)"></th>' : ''}
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <p style="font-size:11.5px;color:var(--muted);margin-top:8px">💡 Total = <strong>${total}</strong> active incidents.${isAdmin ? ' Edit % inline and press Tab/Enter to save.' : ''}</p>`;
+}
+
+function saveOwnershipPct(name, val) {
+  const o = getOwnership();
+  const n = parseFloat(val);
+  if (isNaN(n) || n < 0) return;
+  o[name] = n;
+  saveOwnership(o);
+  renderOwnership();
+}
+
+function removeOwnershipRow(name) {
+  if (!confirm(`Remove "${name}" from ownership targets?`)) return;
+  const o = getOwnership();
+  delete o[name];
+  saveOwnership(o);
+  renderOwnership();
+}
+
+function addOwnershipRow() {
+  const name = prompt('Enter assignee name:');
+  if (!name || !name.trim()) return;
+  const pct = prompt(`Target % for "${name.trim()}":`);
+  const n = parseFloat(pct);
+  if (isNaN(n) || n < 0 || n > 100) { toast('Invalid percentage', 'err'); return; }
+  const o = getOwnership();
+  o[name.trim()] = n;
+  saveOwnership(o);
+  renderOwnership();
+}
+
+// ══════════════════════════════════════════════
+//  ASSIGNEE WORKLOAD  (cross-type dashboard)
+// ══════════════════════════════════════════════
+function renderAssigneeWorkload() {
+  const el = document.getElementById('assignee-workload-wrap');
+  if (!el) return;
+
+  const activeOnly = document.getElementById('aw-active-only')?.checked ?? true;
+  const q = (document.getElementById('aw-search')?.value || '').toLowerCase().trim();
+
+  const TYPES = Object.keys(TICKET_TYPES); // ['incident','problem','change','service_request']
+  const TYPE_META = {
+    incident:        { label:'Incidents',       short:'INC', color:'#2563eb', bg:'#eff6ff' },
+    problem:         { label:'Problems',         short:'PRB', color:'#dc2626', bg:'#fef2f2' },
+    change:          { label:'Changes',          short:'CHG', color:'#d97706', bg:'#fffbeb' },
+    service_request: { label:'Svc Requests',     short:'SRQ', color:'#7c3aed', bg:'#f5f3ff' },
+  };
+  // PRJ counts are stored manually per assignee in localStorage
+  const PRJ_KEY = 'tt_prj_counts';
+  const prjCounts = lsGet(PRJ_KEY) || {};
+
+  // Gather all tickets across all types
+  // map: assignee → { total, byType: {incident:{active,resolved,oldest}, ...} }
+  const map = {};
+
+  TYPES.forEach(type => {
+    const all = Object.values(lsGet(typeLsKey(type, 'tickets')) || {});
+    all.forEach(t => {
+      const name = (t.assigned_to || '').trim() || '— Unassigned —';
+      if (!map[name]) {
+        map[name] = { total: 0, totalActive: 0, totalResolved: 0, byType: {} };
+        TYPES.forEach(tp => { map[name].byType[tp] = { active: 0, resolved: 0, tickets: [], oldestDays: null }; });
+      }
+      const bucket = map[name].byType[type];
+      if (t.is_resolved) {
+        bucket.resolved++;
+        map[name].totalResolved++;
+      } else {
+        bucket.active++;
+        map[name].totalActive++;
+        // track oldest
+        const age = calcAgeDays(t.created_date || t.imported_at);
+        if (age !== null && (bucket.oldestDays === null || age > bucket.oldestDays)) {
+          bucket.oldestDays = age;
+        }
+      }
+      map[name].total++;
+      bucket.tickets.push(t.ticket_id);
+    });
+  });
+
+  // Filter
+  let rows = Object.entries(map)
+    .filter(([name]) => !q || name.toLowerCase().includes(q))
+    .filter(([, data]) => !activeOnly || data.totalActive > 0)
+    .sort((a, b) => b[1].totalActive - a[1].totalActive);
+
+  if (!rows.length) {
+    el.innerHTML = `<p style="color:var(--muted);font-size:13px;padding:8px 0">No data found.${q ? ' Try clearing the search.' : ''}</p>`;
+    return;
+  }
+
+  // maxActive includes PRJ so bar never overflows
+  const maxActive = Math.max(...rows.map(([name, d]) => d.totalActive + (parseInt(prjCounts[name], 10) || 0)), 1);
+
+  // Column headers
+  const typeHeaders = TYPES.map(tp =>
+    `<th style="padding:7px 12px;text-align:center;border-bottom:1px solid var(--border);color:${TYPE_META[tp].color};font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">
+      ${TYPE_META[tp].short}
+    </th>`
+  ).join('');
+
+  const tableRows = rows.map(([name, data], idx) => {
+    const isUnassigned = name === '— Unassigned —';
+
+    // Per-type cells
+    const typeCells = TYPES.map(tp => {
+      const b = data.byType[tp];
+      const count = activeOnly ? b.active : b.active + b.resolved;
+      if (count === 0) return `<td style="padding:7px 12px;text-align:center;color:var(--border);font-size:13px">—</td>`;
+
+      // Mini bar width relative to max of this type across all assignees
+      const typeMax = Math.max(...rows.map(([, d]) => activeOnly ? d.byType[tp].active : d.byType[tp].active + d.byType[tp].resolved), 1);
+      const typeBarW = ((count / typeMax) * 100).toFixed(1);
+
+      const clickAttr = `onclick="goToTypeAssignee('${tp}','${esc(name === '— Unassigned —' ? '' : name)}')" title="View ${TYPE_META[tp].label} tickets for ${esc(name)}" style="cursor:pointer"`;
+
+      return `<td ${clickAttr} style="padding:7px 12px;text-align:center">
+        <div style="font-weight:700;font-size:15px;color:${TYPE_META[tp].color}">${count}</div>
+        <div style="height:4px;border-radius:2px;background:${TYPE_META[tp].bg};margin-top:3px;overflow:hidden">
+          <div style="height:100%;width:${typeBarW}%;background:${TYPE_META[tp].color};border-radius:2px"></div>
+        </div>
+        ${!activeOnly && b.resolved > 0 ? `<div style="font-size:10px;color:var(--green);margin-top:2px">${b.resolved} resolved</div>` : ''}
+      </td>`;
+    }).join('');
+
+    // Oldest active ticket age (across all types)
+    const allOldest = TYPES.reduce((max, tp) => {
+      const d = data.byType[tp].oldestDays;
+      return (d !== null && d > max) ? d : max;
+    }, -1);
+    const oldestCell = allOldest >= 0
+      ? `<td style="padding:7px 12px;text-align:center">${agingBadge(new Date(Date.now() - allOldest * 86400000).toISOString())}</td>`
+      : `<td style="padding:7px 12px;text-align:center;color:var(--muted)">—</td>`;
+
+    // PRJ cell — editable number input, saved on change
+    const prjVal = parseInt(prjCounts[name], 10) || 0;
+    const prjCell = `<td style="padding:7px 12px;text-align:center">
+      <input type="number" min="0" value="${prjVal || ''}"
+        title="Enter Project ticket count for ${esc(name)}"
+        style="width:52px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;font-size:13px;font-weight:700;color:#7c3aed;text-align:center;background:var(--surface)"
+        onchange="savePrjCount('${esc(name)}', this.value)"
+        placeholder="0"/>
+    </td>`;
+
+    // Total shown = system active (INC+PRB+CHG+SRQ) + PRJ
+    const displayTotal = data.totalActive + prjVal;
+    const totalBarW    = maxActive > 0 ? ((displayTotal / maxActive) * 100).toFixed(1) : 0;
+
+    return `<tr style="border-bottom:1px solid var(--border)${idx % 2 === 0 ? '' : ';background:var(--bg)'}">
+      <td style="padding:8px 12px;font-weight:${isUnassigned ? '400' : '600'};color:${isUnassigned ? 'var(--muted)' : 'var(--text)'}">
+        ${esc(name)}
+      </td>
+      <td style="padding:7px 12px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="font-weight:700;font-size:17px;color:var(--accent);min-width:24px">${displayTotal}</div>
+          <div style="flex:1;background:var(--bg);border-radius:3px;height:8px;overflow:hidden;min-width:50px">
+            <div style="height:100%;width:${totalBarW}%;background:var(--accent);border-radius:3px"></div>
+          </div>
+          ${data.totalResolved > 0 ? `<span style="font-size:11px;color:var(--green)">+${data.totalResolved}✓</span>` : ''}
+        </div>
+      </td>
+      ${typeCells}
+      ${prjCell}
+      ${oldestCell}
+    </tr>`;
+  }).join('');
+
+  el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:13px;min-width:600px">
+    <thead>
+      <tr style="background:var(--bg)">
+        <th style="padding:7px 12px;text-align:left;border-bottom:1px solid var(--border);color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em">Assignee</th>
+        <th style="padding:7px 12px;text-align:left;border-bottom:1px solid var(--border);color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;min-width:160px">Total Active</th>
+        ${typeHeaders}
+        <th style="padding:7px 12px;text-align:center;border-bottom:1px solid var(--border);color:#7c3aed;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em">PRJ</th>
+        <th style="padding:7px 12px;text-align:center;border-bottom:1px solid var(--border);color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em">Oldest</th>
+      </tr>
+    </thead>
+    <tbody>${tableRows}</tbody>
+  </table>
+  <p style="color:var(--muted);font-size:11.5px;margin-top:8px">💡 <strong>PRJ</strong> counts are entered manually — type a number and press Tab/Enter to save.</p>`;
+}
+
+function savePrjCount(assignee, val) {
+  const counts = lsGet('tt_prj_counts') || {};
+  const n = parseInt(val, 10);
+  if (isNaN(n) || n <= 0) delete counts[assignee];
+  else counts[assignee] = n;
+  lsSet('tt_prj_counts', counts);
+  // Re-render so Total Active updates immediately
+  renderAssigneeWorkload();
+}
+
+// Click a type cell → switch to that type and filter Active Tickets by assignee
+function goToTypeAssignee(type, assignee) {
+  switchType(type);
+  // Navigate to Active page
+  document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelector('.nav-link[data-page="active"]').classList.add('active');
+  document.getElementById('page-active').classList.add('active');
+  // Set assignee filter
+  document.getElementById('active-search').value = '';
+  document.getElementById('f-priority').value = '';
+  document.getElementById('f-manual-status').value = '';
+  document.getElementById('f-age-band').value = '';
+  renderActive();
+  // After renderActive rebuilds the assignee select, set it
+  const selA = document.getElementById('f-assignee');
+  if (assignee) {
+    // Find matching option (case-insensitive)
+    const opt = Array.from(selA.options).find(o => o.value.toLowerCase() === assignee.toLowerCase());
+    if (opt) selA.value = opt.value;
+  }
+  renderActive();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function renderManualBreakdown(active) {
+  const el = document.getElementById('manual-breakdown');
+
+  // Group tickets by manual_status
+  const groups = {}; // { status → [ticket, ...] }
+  active.forEach(t => {
+    const ms = (t.manual_status || '').trim() || '— Not Set —';
+    if (!groups[ms]) groups[ms] = [];
+    groups[ms].push(t);
+  });
+
+  // Sort: "Not Set" last, rest by count desc
+  const entries = Object.entries(groups).sort((a, b) => {
+    if (a[0] === '— Not Set —') return 1;
+    if (b[0] === '— Not Set —') return -1;
+    return b[1].length - a[1].length;
+  });
+
+  if (!entries.length) {
+    el.innerHTML = '<p style="color:var(--muted);font-size:13px;padding:8px 0">No active tickets.</p>';
+    return;
+  }
+
+  const total = active.length;
+  const maxCount = Math.max(...entries.map(e => e[1].length));
+
+  el.innerHTML = `<table class="breakdown-table">
+    <thead><tr>
+      <th style="width:160px">Manual Status</th>
+      <th style="width:60px">Count</th>
+      <th style="width:120px">% of Active</th>
+      <th>Ticket IDs</th>
+    </tr></thead>
+    <tbody>
+      ${entries.map(([status, list]) => {
+        const pct = total > 0 ? ((list.length / total) * 100).toFixed(1) : 0;
+        const barW = maxCount > 0 ? ((list.length / maxCount) * 100).toFixed(1) : 0;
+        const isNone = status === '— Not Set —';
+        const clickAttr = !isNone ? `onclick="goToManualStatus('${esc(status)}')" title="Click to filter Active Tickets by this status" style="cursor:pointer"` : '';
+        const ids = list.map(t =>
+          `<span class="bd-id" onclick="goToTicket('${esc(t.ticket_id)}')" title="Go to ticket">${esc(t.ticket_id)}</span>`
+        ).join('');
+        return `<tr class="${isNone ? 'ms-none-row' : ''}">
+          <td ${clickAttr}>
+            <strong style="${!isNone ? 'color:var(--accent);text-decoration:underline dotted' : ''}">${esc(status)}</strong>
+            <div class="bd-bar" style="width:${barW}%;background:${isNone ? '#e5e7eb' : '#d97706'}"></div>
+          </td>
+          <td ${clickAttr} style="font-weight:700;font-size:15px">${list.length}</td>
+          <td style="color:var(--muted)">${pct}%</td>
+          <td><div class="bd-ids">${ids}</div></td>
+        </tr>`;
+      }).join('')}
+    </tbody>
+  </table>`;
+}
+
+// Jump to Active Tickets tab and highlight the ticket
+function goToTicket(ticketId) {
+  document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelector('.nav-link[data-page="active"]').classList.add('active');
+  document.getElementById('page-active').classList.add('active');
+  document.getElementById('active-search').value = ticketId;
+  renderActive();
+  // Scroll to and briefly highlight the row
+  setTimeout(() => {
+    const row = document.querySelector(`tr[data-id="${ticketId}"]`);
+    if (row) {
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      row.style.transition = 'background .2s';
+      row.style.background = '#fef9c3';
+      setTimeout(() => row.style.background = '', 1800);
+    }
+  }, 100);
+}
+
+// Jump to Active Tickets tab filtered by a manual status value
+function goToManualStatus(status) {
+  document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelector('.nav-link[data-page="active"]').classList.add('active');
+  document.getElementById('page-active').classList.add('active');
+  // Clear search/other filters, set manual status filter
+  document.getElementById('active-search').value = '';
+  document.getElementById('f-priority').value = '';
+  document.getElementById('f-assignee').value = '';
+  // Set the manual status filter then render — the select gets rebuilt inside renderActive
+  // so we store the desired value and renderActive will re-select it
+  document.getElementById('f-manual-status').dataset.pending = status;
+  renderActive();
+  // After render the select is rebuilt — find and set the right option
+  const sel = document.getElementById('f-manual-status');
+  sel.value = status;
+  // Trigger filter with the now-set value
+  renderActive();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function clearActiveFilters() {
+  document.getElementById('active-search').value = '';
+  document.getElementById('f-priority').value = '';
+  document.getElementById('f-assignee').value = '';
+  document.getElementById('f-manual-status').value = '';
+  document.getElementById('f-age-band').value = '';
+  renderActive();
+}
+
+// Jump to Active Tickets tab filtered by aging band
+// band: 'green' | 'yellow' | 'orange' | 'red'
+function goToAgingBand(band) {
+  document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelector('.nav-link[data-page="active"]').classList.add('active');
+  document.getElementById('page-active').classList.add('active');
+  document.getElementById('active-search').value = '';
+  document.getElementById('f-priority').value = '';
+  document.getElementById('f-assignee').value = '';
+  document.getElementById('f-manual-status').value = '';
+  document.getElementById('f-age-band').value = band;
+  renderActive();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ── Aging helper: which band does a ticket fall into? ──
+function ageBand(ticket) {
+  const d = calcAgeDays(ticket.created_date || ticket.imported_at);
+  return ageBandFromDays(d);
+}
+
+// ── Top 10 oldest tickets list ──
+function renderOldestTickets(active) {
+  const el = document.getElementById('ch-oldest');
+  const sorted = active
+    .map(t => ({ t, d: calcAgeDays(t.created_date || t.imported_at) ?? -1 }))
+    .filter(x => x.d >= 0)
+    .sort((a, b) => b.d - a.d)
+    .slice(0, 10);
+  if (!sorted.length) {
+    el.innerHTML = '<p style="color:var(--muted);font-size:13px">No data</p>';
+    return;
+  }
+  el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:13px">
+    <thead><tr>
+      <th style="text-align:left;padding:5px 8px;border-bottom:1px solid var(--border);color:var(--muted)">#</th>
+      <th style="text-align:left;padding:5px 8px;border-bottom:1px solid var(--border);color:var(--muted)">Ticket ID</th>
+      <th style="text-align:left;padding:5px 8px;border-bottom:1px solid var(--border);color:var(--muted)">Title</th>
+      <th style="text-align:left;padding:5px 8px;border-bottom:1px solid var(--border);color:var(--muted)">Assigned To</th>
+      <th style="text-align:right;padding:5px 8px;border-bottom:1px solid var(--border);color:var(--muted)">Age</th>
+    </tr></thead>
+    <tbody>
+    ${sorted.map(({t, d}, i) => `<tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:5px 8px;color:var(--muted)">${i+1}</td>
+      <td style="padding:5px 8px"><span class="bd-id" onclick="goToTicket('${esc(t.ticket_id)}')" title="Go to ticket">${esc(t.ticket_id)}</span></td>
+      <td style="padding:5px 8px;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(t.title||'')}">${esc(t.title||'—')}</td>
+      <td style="padding:5px 8px;color:var(--muted)">${esc(t.assigned_to||'—')}</td>
+      <td style="padding:5px 8px;text-align:right">${agingBadge(t.created_date||t.imported_at)}</td>
+    </tr>`).join('')}
+    </tbody>
+  </table>`;
+}
+
+// ── Aging breakdown table (click band → filter active tickets) ──
+function renderAgingBreakdown(active) {
+  const el = document.getElementById('aging-breakdown');
+  const bands = getAgingConfig(); // ← driven by current type
+  const total = active.length || 1;
+  const rows = bands.map(b => {
+    const list = active.filter(t => ageBand(t) === b.key);
+    if (!list.length) return '';
+    const pct = ((list.length / total) * 100).toFixed(1);
+    const ids = list.map(t =>
+      `<span class="bd-id" onclick="goToTicket('${esc(t.ticket_id)}')" title="Go to ticket">${esc(t.ticket_id)}</span>`
+    ).join('');
+    return `<tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:7px 10px;cursor:pointer" onclick="goToAgingBand('${b.key}')">
+        <span style="display:inline-block;padding:2px 10px;border-radius:10px;font-size:12px;font-weight:700;background:${b.bg};color:${b.color}">${esc(b.label)}</span>
+      </td>
+      <td style="padding:7px 10px;font-weight:700;font-size:15px;cursor:pointer;color:${b.color}" onclick="goToAgingBand('${b.key}')">${list.length}</td>
+      <td style="padding:7px 10px;color:var(--muted)">${pct}%</td>
+      <td style="padding:7px 10px"><div class="bd-ids">${ids}</div></td>
+    </tr>`;
+  }).join('');
+
+  el.innerHTML = rows ? `<table style="width:100%;border-collapse:collapse;font-size:13px">
+    <thead><tr>
+      <th style="text-align:left;padding:5px 10px;border-bottom:1px solid var(--border);color:var(--muted)">Band</th>
+      <th style="text-align:left;padding:5px 10px;border-bottom:1px solid var(--border);color:var(--muted)">Count</th>
+      <th style="text-align:left;padding:5px 10px;border-bottom:1px solid var(--border);color:var(--muted)">% of Active</th>
+      <th style="text-align:left;padding:5px 10px;border-bottom:1px solid var(--border);color:var(--muted)">Ticket IDs</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>` : '<p style="color:var(--muted);font-size:13px">No active tickets.</p>';
+}
+
+function countBy(arr, field, fallback, limit=0) {
+  const map = {};
+  arr.forEach(t => { const k = (t[field]||'').trim()||fallback; map[k]=(map[k]||0)+1; });
+  let entries = Object.entries(map).sort((a,b)=>b[1]-a[1]);
+  if (limit) entries = entries.slice(0, limit);
+  return entries;
+}
+
+function renderBar(id, entries, color) {
+  const el = document.getElementById(id);
+  if (!entries.length) { el.innerHTML = '<p style="color:var(--muted);font-size:13px">No data</p>'; return; }
+  const max = Math.max(...entries.map(e=>e[1]));
+  el.innerHTML = entries.map(([lbl,cnt]) => {
+    const pct = max > 0 ? (cnt/max*100).toFixed(1) : 0;
+    return `<div class="bar-row">
+      <div class="bar-label" title="${esc(lbl)}">${esc(lbl)}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>
+      <div class="bar-count">${cnt}</div>
+    </div>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════
+//  ACTIVE TICKETS TABLE
+// ══════════════════════════════════════════════
+// ── Sort state ──
+let sortCol = 'imported_at';
+let sortDir = 'desc'; // 'asc' | 'desc'
+
+const MANUAL_STATUSES = ['','Open','In Progress','Pending','On Hold','Waiting for Info','Awaiting Confirmation from User','Can Be Closed Today','Corrective Change','Resolved','Closed'];
+
+function renderActive() {
+  const q   = document.getElementById('active-search').value.toLowerCase();
+  const fp  = document.getElementById('f-priority').value.toLowerCase();
+  const fa  = document.getElementById('f-assignee').value.toLowerCase();
+  const fm  = document.getElementById('f-manual-status').value; // exact match, preserve case
+  const fab = document.getElementById('f-age-band').value;      // age band filter
+
+  // Rebuild age-band dropdown options from current type's config (preserves selected value)
+  const selAge = document.getElementById('f-age-band');
+  selAge.innerHTML = '<option value="">All Ages</option>' +
+    getAgingConfig().map(b =>
+      `<option value="${b.key}" ${fab===b.key?'selected':''}>${esc(b.shortLabel)}</option>`
+    ).join('');
+
+  let tickets = Object.values(getTickets()).filter(t => !t.is_resolved);
+
+  // Populate assignee filter
+  const assignees = [...new Set(tickets.map(t => t.assigned_to).filter(Boolean))].sort();
+  const selA = document.getElementById('f-assignee');
+  selA.innerHTML = '<option value="">All Assignees</option>' +
+    assignees.map(a => `<option ${a.toLowerCase()===fa?'selected':''}>${esc(a)}</option>`).join('');
+
+  // Populate manual status filter from actual data + fixed list
+  const usedStatuses = [...new Set(tickets.map(t => t.manual_status||'').filter(Boolean))].sort();
+  const allStatuses  = [...new Set([...MANUAL_STATUSES.filter(s=>s), ...usedStatuses])];
+  const selM = document.getElementById('f-manual-status');
+  selM.innerHTML = '<option value="">All Manual Statuses</option>' +
+    allStatuses.map(s => `<option value="${esc(s)}" ${fm===s?'selected':''}>${esc(s)}</option>`).join('');
+
+  if (q)   tickets = tickets.filter(t =>
+    (t.ticket_id||'').toLowerCase().includes(q) ||
+    (t.title||'').toLowerCase().includes(q) ||
+    (t.assigned_to||'').toLowerCase().includes(q)
+  );
+  if (fp)  tickets = tickets.filter(t => (t.priority||'').toLowerCase() === fp);
+  if (fa)  tickets = tickets.filter(t => (t.assigned_to||'').toLowerCase() === fa);
+  if (fm)  tickets = tickets.filter(t => (t.manual_status||'') === fm);
+  if (fab) tickets = tickets.filter(t => ageBand(t) === fab);
+
+  // Apply column sort
+  tickets.sort((a, b) => {
+    let av, bv;
+    if (sortCol === '_age') {
+      av = calcAgeDays(a.created_date||a.imported_at) ?? -1;
+      bv = calcAgeDays(b.created_date||b.imported_at) ?? -1;
+      return sortDir === 'asc' ? av - bv : bv - av;
+    }
+    if (sortCol === 'eta') {
+      // Empty ETAs sort last
+      av = a.eta || 'zzzz';
+      bv = b.eta || 'zzzz';
+      if (av < bv) return sortDir === 'asc' ? -1 : 1;
+      if (av > bv) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    }
+    av = (a[sortCol] || '').toLowerCase();
+    bv = (b[sortCol] || '').toLowerCase();
+    if (av < bv) return sortDir === 'asc' ? -1 : 1;
+    if (av > bv) return sortDir === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  // Update sort indicators on headers
+  document.querySelectorAll('#active-table th.sortable').forEach(th => {
+    th.classList.remove('sort-asc','sort-desc');
+    if (th.dataset.col === sortCol) th.classList.add(sortDir === 'asc' ? 'sort-asc' : 'sort-desc');
+  });
+
+  const tbody = document.getElementById('active-tbody');
+  if (!tickets.length) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="14">No active tickets found.</td></tr>'; return;
+  }
+
+  tbody.innerHTML = tickets.map(t => {
+    const ms = t.manual_status || '';
+    const manualOpts = MANUAL_STATUSES.map(s =>
+      `<option value="${esc(s)}" ${ms===s?'selected':''}>${s||'— Not set —'}</option>`
+    ).join('');
+    const latestComment = (t.comments && t.comments.length) ? t.comments[0].text : '';
+    const commentDisplay = latestComment
+      ? `<div class="comment-display">${esc(latestComment)}</div>`
+      : `<div class="comment-display empty">No comment yet</div>`;
+    const historyCount = (t.comments && t.comments.length > 1)
+      ? `<button class="comment-toggle" onclick="openCommentHistory('${esc(t.ticket_id)}')">+ ${t.comments.length - 1} older</button>`
+      : '';
+    return `<tr data-id="${esc(t.ticket_id)}">
+      <td style="padding:8px 6px 8px 12px">
+        <input type="checkbox" class="row-chk" data-id="${esc(t.ticket_id)}"
+          style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent)"
+          onchange="onRowCheck()"/>
+      </td>
+      <td><strong>${esc(t.ticket_id)}</strong></td>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(t.title)}">${esc(t.title)||'—'}</td>
+      <td>${priB(t.priority)}</td>
+      <td>${statB(t.status)}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:5px">
+          <select class="status-select" data-id="${esc(t.ticket_id)}" onchange="markDirty(this)">${manualOpts}</select>
+          <button class="btn-save-inline" onclick="saveInlineStatus('${esc(t.ticket_id)}')">Save</button>
+        </div>
+      </td>
+      <td>${buildPrevHtml(t)}</td>
+      <td class="comment-cell">
+        ${commentDisplay}
+        ${historyCount}
+        <textarea class="comment-input" data-id="${esc(t.ticket_id)}" placeholder="Write a comment…" oninput="this.classList.add('dirty')" rows="2"></textarea>
+        <div class="comment-actions">
+          <button class="btn-comment-save" onclick="saveComment('${esc(t.ticket_id)}')">💬 Save</button>
+        </div>
+      </td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(t.assigned_to)}">${esc(t.assigned_to)||'—'}</td>
+      <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(t.short_description)}">${esc(t.short_description)||'—'}</td>
+      <td>${fmtD(t.created_date||t.imported_at)}</td>
+      <td style="text-align:center">${agingBadge(t.created_date||t.imported_at)}</td>
+      <td style="text-align:center;white-space:nowrap">
+        <input type="date" class="eta-input" data-id="${esc(t.ticket_id)}"
+          value="${esc(t.eta||'')}"
+          style="padding:3px 6px;border:1px solid var(--border);border-radius:4px;font-size:12px;color:var(--text);background:var(--surface);cursor:pointer"
+          onchange="saveEta('${esc(t.ticket_id)}', this.value)"
+          title="Set ETA for this ticket"/>
+        ${t.eta ? `<div style="font-size:10.5px;margin-top:2px;${new Date(t.eta)<new Date()?'color:var(--red);font-weight:700':'color:var(--muted)'}">${new Date(t.eta)<new Date()?'⚠ Overdue':''}</div>` : ''}
+      </td>
+      <td><button class="btn btn-secondary btn-sm" onclick="openDetail('${esc(t.ticket_id)}')">View</button></td>
+    </tr>`;
+  }).join('');
+  // Re-apply saved column visibility after table re-render
+  initColPicker();
+  // Reset select-all checkbox and hide bulk bar on re-render
+  const chkAll = document.getElementById('chk-all');
+  if (chkAll) chkAll.checked = false;
+  updateBulkBar();
+}
+
+// ══════════════════════════════════════════════
+//  BULK SELECTION
+// ══════════════════════════════════════════════
+function getCheckedIds() {
+  return [...document.querySelectorAll('.row-chk:checked')].map(c => c.dataset.id);
+}
+
+function onRowCheck() {
+  // Update select-all state
+  const all  = document.querySelectorAll('.row-chk');
+  const chkd = document.querySelectorAll('.row-chk:checked');
+  const chkAll = document.getElementById('chk-all');
+  if (chkAll) {
+    chkAll.checked = chkd.length > 0 && chkd.length === all.length;
+    chkAll.indeterminate = chkd.length > 0 && chkd.length < all.length;
+  }
+  updateBulkBar();
+}
+
+function toggleSelectAll(chkAll) {
+  document.querySelectorAll('.row-chk').forEach(c => { c.checked = chkAll.checked; });
+  updateBulkBar();
+}
+
+function updateBulkBar() {
+  const ids  = getCheckedIds();
+  const bar  = document.getElementById('bulk-bar');
+  const cnt  = document.getElementById('bulk-count');
+  if (!bar) return;
+  bar.style.display = ids.length > 0 ? 'flex' : 'none';
+  if (cnt) cnt.textContent = `${ids.length} selected`;
+}
+
+function bulkClear() {
+  document.querySelectorAll('.row-chk').forEach(c => { c.checked = false; });
+  const chkAll = document.getElementById('chk-all');
+  if (chkAll) { chkAll.checked = false; chkAll.indeterminate = false; }
+  updateBulkBar();
+}
+
+function bulkApplyStatus() {
+  const ids    = getCheckedIds();
+  const status = document.getElementById('bulk-status-sel').value;
+  if (!ids.length) { toast('No tickets selected', 'err'); return; }
+  if (!status)     { toast('Please choose a status to apply', 'err'); return; }
+
+  const tickets = getTickets();
+  const now = nowISO();
+  let changed = 0;
+  ids.forEach(id => {
+    const t = tickets[id];
+    if (!t) return;
+    const oldManual = t.manual_status || '';
+    if (oldManual !== status) {
+      if (oldManual) pushStatusHistory(t, oldManual, now);
+      t.manual_status = status;
+      changed++;
+    }
+  });
+  saveTickets(tickets);
+  toast(`✔ ${changed} ticket${changed !== 1 ? 's' : ''} updated to "${status}"`, 'ok');
+  document.getElementById('bulk-status-sel').value = '';
+  bulkClear();
+  renderActive();
+  renderDashboard();
+}
+
+// ── Push an entry into a ticket's status_history array ──
+// history = [{status, saved_at}, ...] newest first; never cleared until ticket closed
+function pushStatusHistory(ticket, statusValue, isoTimestamp) {
+  if (!statusValue) return; // don't log empty entries
+  if (!Array.isArray(ticket.status_history)) ticket.status_history = [];
+  // Avoid duplicate consecutive entries
+  if (ticket.status_history.length > 0 && ticket.status_history[0].status === statusValue) return;
+  ticket.status_history.unshift({ status: statusValue, saved_at: isoTimestamp });
+}
+
+function buildPrevHtml(ticket) {
+  const hist = ticket.status_history;
+  if (!hist || !hist.length) return '<span class="prev-none">—</span>';
+  return '<div class="prev-status-wrap">' +
+    hist.map(h =>
+      `<div class="prev-entry">
+        <span class="ps-val">${esc(h.status)}</span>
+        <span class="ps-date">${fmtDShort(h.saved_at)}</span>
+      </div>`
+    ).join('') +
+  '</div>';
+}
+
+function markDirty(sel) {
+  sel.classList.add('dirty');
+}
+
+function saveEta(ticketId, value) {
+  const tickets = getTickets();
+  const t = tickets[ticketId];
+  if (!t) return;
+  t.eta = value || null;
+  saveTickets(tickets);
+  // Refresh the overdue label under the date input without full re-render
+  const input = document.querySelector(`.eta-input[data-id="${ticketId}"]`);
+  if (input) {
+    const cell = input.parentElement;
+    let lbl = cell.querySelector('.eta-lbl');
+    if (!lbl) { lbl = document.createElement('div'); lbl.className = 'eta-lbl'; lbl.style.fontSize = '10.5px'; lbl.style.marginTop = '2px'; cell.appendChild(lbl); }
+    if (value && new Date(value) < new Date()) {
+      lbl.style.color = 'var(--red)'; lbl.style.fontWeight = '700'; lbl.textContent = '⚠ Overdue';
+    } else {
+      lbl.textContent = '';
+    }
+  }
+  toast('ETA saved', 'ok');
+}
+
+function saveInlineStatus(ticketId) {
+  const sel = document.querySelector(`.status-select[data-id="${ticketId}"]`);
+  if (!sel) return;
+  const newStatus = sel.value;
+  const tickets = getTickets();
+  const t = tickets[ticketId];
+  if (!t) return;
+
+  const oldManual = t.manual_status || '';
+  // Push the OLD manual status into history before replacing it
+  if (oldManual && oldManual !== newStatus) {
+    pushStatusHistory(t, oldManual, nowISO());
+  }
+  t.manual_status = newStatus;
+
+  // If manually set to a resolved status, archive it
+  if (newStatus && isResolved(newStatus)) {
+    // Also log the resolved status itself into history
+    pushStatusHistory(t, newStatus, nowISO());
+    t.is_resolved = 1;
+    t.archived_at = nowISO();
+  }
+
+  saveTickets(tickets);
+  sel.classList.remove('dirty');
+  toast('Status saved for ' + ticketId, 'ok');
+
+  if (t.is_resolved) {
+    renderActive();
+    renderDashboard();
+  } else {
+    // Update the prev-status cell in the flat row (6th cell, index 5)
+    const row = document.querySelector(`tr[data-id="${ticketId}"]`);
+    if (row) row.cells[5].innerHTML = buildPrevHtml(t);
+    refreshNavCount();
+  }
+}
+
+// ══════════════════════════════════════════════
+//  COMMENTS
+// ══════════════════════════════════════════════
+function saveComment(ticketId) {
+  const textarea = document.querySelector(`.comment-input[data-id="${ticketId}"]`);
+  if (!textarea) return;
+  const text = textarea.value.trim();
+  if (!text) { toast('Comment is empty', 'err'); return; }
+
+  const tickets = getTickets();
+  const t = tickets[ticketId];
+  if (!t) return;
+
+  if (!Array.isArray(t.comments)) t.comments = [];
+  t.comments.unshift({ text, saved_at: nowISO() });
+
+  saveTickets(tickets);
+  textarea.value = '';
+  textarea.classList.remove('dirty');
+  toast('Comment saved', 'ok');
+
+  // Update comment display cell in the flat row
+  const row = document.querySelector(`tr[data-id="${ticketId}"]`);
+  if (row) {
+    const cell = row.querySelector('.comment-cell');
+    if (cell) {
+      const display = cell.querySelector('.comment-display');
+      if (display) { display.classList.remove('empty'); display.textContent = t.comments[0].text; }
+      let toggle = cell.querySelector('.comment-toggle');
+      if (t.comments.length > 1) {
+        if (!toggle) {
+          toggle = document.createElement('button');
+          toggle.className = 'comment-toggle';
+          toggle.onclick = () => openCommentHistory(ticketId);
+          display && display.after(toggle);
+        }
+        toggle.textContent = `+ ${t.comments.length - 1} older`;
+      }
+    }
+  }
+}
+
+function openCommentHistory(ticketId) {
+  const tickets = getTickets();
+  const t = tickets[ticketId];
+  if (!t || !t.comments || !t.comments.length) return;
+
+  document.getElementById('comment-modal-title').textContent = `Comments — ${ticketId}`;
+
+  document.getElementById('comment-history-body').innerHTML =
+    t.comments.map((c, i) => `
+      <div style="padding:12px 14px;background:${i===0?'var(--accent-light)':'var(--bg)'};border-radius:6px;margin-bottom:8px;">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:5px;">
+          ${i === 0 ? '<strong style="color:var(--accent)">Latest</strong> · ' : ''}${fmtDShort(c.saved_at)}
+        </div>
+        <div style="font-size:13.5px;white-space:pre-wrap;word-break:break-word;line-height:1.5;">${esc(c.text)}</div>
+      </div>`
+    ).join('');
+
+  document.getElementById('modal-comments').classList.add('open');
+}
+
+function closeCommentHistory() {
+  document.getElementById('modal-comments').classList.remove('open');
+}
+
+// ══════════════════════════════════════════════
+//  COLUMN VISIBILITY
+// ══════════════════════════════════════════════
+const LS_COLS = 'tt_col_visibility';
+// 12 data columns (indices 0-11); Actions col always visible, not counted
+const TOTAL_COLS = 12;
+
+function getColVisibility() {
+  const saved = lsGet(LS_COLS);
+  if (Array.isArray(saved) && saved.length === TOTAL_COLS) return saved;
+  // Default: all visible
+  return Array(TOTAL_COLS).fill(true);
+}
+
+function saveColVisibility(vis) { lsSet(LS_COLS, vis); }
+
+function applyColVisibility() {
+  const vis = readPickerState();
+  saveColVisibility(vis);
+  const table = document.getElementById('active-table');
+  if (!table) return;
+  // Apply to every row (thead + tbody)
+  table.querySelectorAll('tr').forEach(row => {
+    // Only touch the first TOTAL_COLS cells; last cell (Actions) always visible
+    Array.from(row.cells).forEach((cell, i) => {
+      if (i < TOTAL_COLS) {
+        cell.classList.toggle('col-hidden', !vis[i]);
+      }
+    });
+  });
+}
+
+function readPickerState() {
+  const checks = document.querySelectorAll('#col-picker-panel input[data-col-idx]');
+  const vis = Array(TOTAL_COLS).fill(true);
+  checks.forEach(cb => { vis[parseInt(cb.dataset.colIdx)] = cb.checked; });
+  return vis;
+}
+
+function initColPicker() {
+  const vis = getColVisibility();
+  document.querySelectorAll('#col-picker-panel input[data-col-idx]').forEach(cb => {
+    cb.checked = vis[parseInt(cb.dataset.colIdx)];
+  });
+  applyColVisibility();
+}
+
+function toggleColPicker(e) {
+  e.stopPropagation();
+  document.getElementById('col-picker-panel').classList.toggle('open');
+}
+
+function closeColPicker() {
+  document.getElementById('col-picker-panel').classList.remove('open');
+}
+
+function showAllCols() {
+  document.querySelectorAll('#col-picker-panel input[data-col-idx]').forEach(cb => cb.checked = true);
+  applyColVisibility();
+}
+
+// Close picker when clicking outside
+document.addEventListener('click', e => {
+  if (!document.getElementById('col-picker-wrap').contains(e.target)) {
+    closeColPicker();
+  }
+});
+
+// Header sort clicks
+document.getElementById('active-table').addEventListener('click', e => {
+  const th = e.target.closest('th.sortable');
+  if (!th) return;
+  const col = th.dataset.col;
+  if (sortCol === col) {
+    sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    sortCol = col;
+    sortDir = 'asc';
+  }
+  renderActive();
+});
+
+let activeD;
+document.getElementById('active-search').addEventListener('input', () => { clearTimeout(activeD); activeD = setTimeout(renderActive, 250); });
+document.getElementById('f-priority').addEventListener('change', renderActive);
+document.getElementById('f-assignee').addEventListener('change', renderActive);
+document.getElementById('f-manual-status').addEventListener('change', renderActive);
+
+// ══════════════════════════════════════════════
+//  RESOLVED TABLE
+// ══════════════════════════════════════════════
+// ── Current performer tab period (days) ──
+let _perfPeriod = 7;
+
+function switchPerfTab(days) {
+  _perfPeriod = days;
+  document.querySelectorAll('.perf-tab').forEach(t => {
+    t.classList.toggle('active', +t.dataset.period === days);
+  });
+  renderPerformers(days);
+}
+
+function renderPerformers(days) {
+  const cutoff = new Date();
+  cutoff.setHours(0,0,0,0);
+  cutoff.setDate(cutoff.getDate() - days);
+
+  // Use resolved_date (from Excel last_updated) as the authoritative resolved date.
+  // Fall back to archived_at (platform import timestamp) if resolved_date not yet stored.
+  const resolvedTickets = Object.values(getTickets()).filter(t => {
+    if (!t.is_resolved) return false;
+    const dateStr = t.resolved_date || t.archived_at;
+    if (!dateStr) return false;
+    return new Date(dateStr) >= cutoff;
+  });
+
+  // Group by assigned_to, track tickets with their resolved date
+  const map = {};
+  resolvedTickets.forEach(t => {
+    const name = (t.assigned_to||'').trim() || '— Unassigned —';
+    if (!map[name]) map[name] = { count: 0, tickets: [] };
+    map[name].count++;
+    map[name].tickets.push({ id: t.ticket_id, resolvedDate: t.resolved_date || t.archived_at });
+  });
+
+  const rows = Object.entries(map).sort((a,b) => b[1].count - a[1].count);
+  const el = document.getElementById('perf-board-wrap');
+
+  if (!rows.length) {
+    const periodLabel = days === 7 ? 'last 7 days' : days === 14 ? 'last 14 days' : 'last 30 days';
+    el.innerHTML = `<p style="color:var(--muted);font-size:13px;padding:8px 0">No tickets resolved in the ${periodLabel} (based on resolved date from Excel).</p>`;
+    return;
+  }
+
+  const maxCount = rows[0][1].count;
+  const medalClass = i => i===0?'r1':i===1?'r2':i===2?'r3':'rn';
+  const medalLabel = i => i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}`;
+
+  el.innerHTML = `<table class="perf-board">
+    <thead><tr>
+      <th style="width:40px">#</th>
+      <th>Assignee</th>
+      <th style="width:80px">Resolved</th>
+      <th>Progress</th>
+      <th>Ticket IDs &amp; Resolved Date</th>
+    </tr></thead>
+    <tbody>
+    ${rows.map(([name, data], i) => {
+      const pct = maxCount > 0 ? ((data.count / maxCount) * 100).toFixed(1) : 0;
+      const ids = data.tickets
+        .sort((a,b) => (b.resolvedDate||'').localeCompare(a.resolvedDate||''))
+        .map(({id, resolvedDate}) => {
+          const dateHint = resolvedDate ? ` · ${fmtD(resolvedDate)}` : '';
+          return `<span class="bd-id" onclick="openDetail('${esc(id)}')" title="Resolved: ${resolvedDate ? fmtD(resolvedDate) : '—'}">${esc(id)}</span>`;
+        }).join('');
+      const isUnassigned = name === '— Unassigned —';
+      // Latest resolved date for this person
+      const latestDate = data.tickets.reduce((best, t) =>
+        (t.resolvedDate||'') > (best||'') ? t.resolvedDate : best, null);
+      return `<tr>
+        <td><span class="perf-rank ${medalClass(i)}">${medalLabel(i)}</span></td>
+        <td style="font-weight:${i<3?'700':'500'};color:${isUnassigned?'var(--muted)':'var(--text)'}">
+          ${esc(name)}
+          ${latestDate ? `<div style="font-size:11px;color:var(--muted);font-weight:400;margin-top:2px">Latest: ${fmtD(latestDate)}</div>` : ''}
+        </td>
+        <td style="font-weight:700;font-size:17px;color:var(--accent)">${data.count}</td>
+        <td>
+          <div class="perf-bar-wrap">
+            <div class="perf-bar-track"><div class="perf-bar-fill" style="width:${pct}%"></div></div>
+            <span style="color:var(--muted);font-size:12px;min-width:34px">${pct}%</span>
+          </div>
+        </td>
+        <td><div class="bd-ids">${ids}</div></td>
+      </tr>`;
+    }).join('')}
+    </tbody>
+  </table>`;
+}
+
+function renderResolved() {
+  // Render performers leaderboard for current tab period
+  renderPerformers(_perfPeriod);
+
+  const q = document.getElementById('resolved-search').value.toLowerCase();
+  let tickets = Object.values(getTickets()).filter(t => t.is_resolved);
+  if (q) tickets = tickets.filter(t =>
+    (t.ticket_id||'').toLowerCase().includes(q) || (t.title||'').toLowerCase().includes(q)
+  );
+  tickets.sort((a,b) => (b.archived_at||'').localeCompare(a.archived_at||''));
+
+  const tbody = document.getElementById('resolved-tbody');
+  if (!tickets.length) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="7">No resolved tickets found.</td></tr>'; return;
+  }
+  tbody.innerHTML = tickets.map(t => `
+    <tr>
+      <td><strong>${esc(t.ticket_id)}</strong></td>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.title)||'—'}</td>
+      <td>${priB(t.priority)}</td>
+      <td>${statB(t.status)}</td>
+      <td>${esc(t.assigned_to)||'—'}</td>
+      <td>${fmtD(t.archived_at)}</td>
+      <td><button class="btn btn-secondary btn-sm" onclick="openDetail('${esc(t.ticket_id)}')">View</button></td>
+    </tr>`).join('');
+}
+
+function resolvedPageLoad() { renderResolved(); }
+let resolvedD;
+document.getElementById('resolved-search').addEventListener('input', () => { clearTimeout(resolvedD); resolvedD = setTimeout(renderResolved, 250); });
+
+// Check if saved mapping is missing short_description and show a warning
+function checkMappingWarn() {
+  const mapping = getMapping();
+  const hasShortDesc = Object.values(mapping).includes('short_description');
+  const hasSavedMapping = Object.keys(mapping).length > 0;
+  const warn = document.getElementById('mapping-warn');
+  // Show warning only if a mapping exists but short_description is missing from it
+  warn.style.display = (hasSavedMapping && !hasShortDesc) ? 'block' : 'none';
+}
+
+// ══════════════════════════════════════════════
+//  TICKET DETAIL MODAL
+// ══════════════════════════════════════════════
+let editingId = null;
+
+function openDetail(id) {
+  const tickets = getTickets();
+  const t = tickets[id];
+  if (!t) return;
+  editingId = id;
+  document.getElementById('detail-title').textContent = 'Ticket: ' + t.ticket_id;
+  const fields = [
+    { l:'Ticket ID',   v:t.ticket_id,   k:null },
+    { l:'Title',       v:t.title,       k:'title',       inp:true },
+    { l:'Status',      v:t.status,      k:'status',      inp:true },
+    { l:'Priority',    v:t.priority,    k:'priority',    inp:true },
+    { l:'Assigned To', v:t.assigned_to, k:'assigned_to', inp:true },
+    { l:'Short Desc',  v:t.short_description, k:'short_description', ta:true },
+    { l:'Created',     v:fmtD(t.created_date), k:null },
+    { l:'Last Updated',v:t.last_updated,k:'last_updated',inp:true },
+    { l:'Imported At', v:fmtD(t.imported_at),  k:null },
+    { l:'Resolved Date (Excel)', v:t.resolved_date ? fmtD(t.resolved_date) : '—', k:null },
+    { l:'Archived At (Import)',  v:t.archived_at   ? fmtD(t.archived_at)   : '—', k:null },
+    { l:'Description', v:t.description, k:'description', ta:true },
+  ];
+  // Build comment history section for the detail modal
+  const commentsHtml = (() => {
+    if (!t.comments || !t.comments.length) {
+      return `<div style="color:var(--muted);font-size:13px;font-style:italic;padding:8px 0;">No comments yet.</div>`;
+    }
+    return t.comments.map((c, i) => `
+      <div style="padding:10px 12px;background:${i===0?'var(--accent-light)':'var(--bg)'};border-radius:6px;margin-bottom:7px;">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">
+          ${i === 0 ? '<strong style="color:var(--accent)">Latest</strong> · ' : ''}${fmtDShort(c.saved_at)}
+        </div>
+        <div style="font-size:13.5px;white-space:pre-wrap;word-break:break-word;line-height:1.5;">${esc(c.text)}</div>
+      </div>`
+    ).join('');
+  })();
+
+  document.getElementById('detail-body').innerHTML =
+    fields.map(f => `
+      <div class="dr"><div class="dl">${f.l}</div><div class="dv">
+        ${f.ta
+          ? `<textarea class="dinput" data-key="${f.k}" rows="3" style="resize:vertical">${esc(f.v||'')}</textarea>`
+          : f.inp
+            ? `<input class="dinput" data-key="${f.k}" value="${esc(f.v||'')}"/>`
+            : `<span>${esc(f.v||'—')}</span>`}
+      </div></div>`).join('') +
+    `<div style="margin-top:18px;border-top:1px solid var(--border);padding-top:14px;">
+      <div style="font-weight:600;font-size:13px;margin-bottom:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;">💬 Comments (${(t.comments||[]).length})</div>
+      ${commentsHtml}
+    </div>`;
+
+  document.getElementById('btn-save-detail').style.display = t.is_resolved ? 'none' : '';
+  document.getElementById('modal-ticket').classList.add('open');
+}
+
+function closeDetail() { document.getElementById('modal-ticket').classList.remove('open'); editingId = null; }
+
+// ── Email compose ──
+function openMailCompose() {
+  if (!editingId) return;
+  const t = getTickets()[editingId];
+  if (!t) return;
+
+  const assignee = (t.assigned_to || '').trim();
+  const priority = (t.priority || 'N/A').trim();
+  const status   = (t.manual_status || t.status || 'N/A').trim();
+  const created  = t.created_date ? fmtD(t.created_date) : (t.imported_at ? fmtD(t.imported_at) : 'N/A');
+  const updated  = t.last_updated ? fmtD(t.last_updated) : 'N/A';
+  const title    = (t.title || '').trim();
+  const desc     = (t.short_description || t.description || '').trim();
+
+  const subject = `Action Required: [${t.ticket_id}] ${title ? '— ' + title : ''}`.trim();
+
+  const greeting = assignee ? `Hi ${assignee},` : 'Hi,';
+
+  const body =
+`${greeting}
+
+I wanted to follow up on the ticket assigned to you and kindly request your urgent attention.
+
+── Ticket Details ──────────────────────────
+  Ticket ID   : ${t.ticket_id}
+  Title       : ${title || '—'}
+  Priority    : ${priority}
+  Status      : ${status}
+  Assigned To : ${assignee || '—'}
+  Created     : ${created}
+  Last Updated: ${updated}
+${desc ? '  Description : ' + desc : ''}
+────────────────────────────────────────────
+
+This ticket is currently open and requires your immediate action. Please prioritise this and provide an update at the earliest.
+
+If you have already started working on this, please update the ticket status so we can track the progress. If you need any additional information or support, feel free to reach out.
+
+Kindly aim to resolve this at the earliest to avoid any further delays.
+
+Thank you for your prompt attention to this matter.
+
+Best regards,
+Team Ticket Tracker`;
+
+  document.getElementById('mail-to').value = '';
+  document.getElementById('mail-cc').value = '';
+  document.getElementById('mail-subject').value = subject;
+  document.getElementById('mail-body').value = body;
+
+  document.getElementById('modal-mail').classList.add('open');
+}
+
+function closeMailCompose() {
+  document.getElementById('modal-mail').classList.remove('open');
+}
+
+function sendMailTo() {
+  const to      = document.getElementById('mail-to').value.trim();
+  const cc      = document.getElementById('mail-cc').value.trim();
+  const subject = document.getElementById('mail-subject').value.trim();
+  const body    = document.getElementById('mail-body').value.trim();
+
+  // Build mailto — 'to' is optional, mail client will let user fill it in
+  let mailto = `mailto:${encodeURIComponent(to)}`;
+  const params = [];
+  if (cc)      params.push(`cc=${encodeURIComponent(cc)}`);
+  if (subject) params.push(`subject=${encodeURIComponent(subject)}`);
+  if (body)    params.push(`body=${encodeURIComponent(body)}`);
+  if (params.length) mailto += '?' + params.join('&');
+
+  window.location.href = mailto;
+}
+
+function copyMailBody() {
+  const body = document.getElementById('mail-body').value;
+  if (!body) return;
+  navigator.clipboard.writeText(body).then(() => toast('Body copied to clipboard', 'ok'))
+    .catch(() => {
+      // Fallback for older browsers
+      const ta = document.createElement('textarea');
+      ta.value = body;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      toast('Body copied to clipboard', 'ok');
+    });
+}
+
+function saveDetail() {
+  if (!editingId) return;
+  const tickets = getTickets();
+  const t = tickets[editingId];
+  if (!t) return;
+  document.querySelectorAll('#detail-body [data-key]').forEach(el => {
+    if (el.dataset.key) t[el.dataset.key] = el.value;
+  });
+  t.is_resolved = isResolved(t.status) ? 1 : 0;
+  t.archived_at = t.is_resolved ? (t.archived_at || nowISO()) : null;
+  saveTickets(tickets);
+  toast('Ticket updated', 'ok');
+  closeDetail();
+  renderActive();
+  renderDashboard();
+}
+
+// ══════════════════════════════════════════════
+//  HISTORY
+// ══════════════════════════════════════════════
+function renderHistory() {
+  const items = getHistory();
+  const el = document.getElementById('history-list');
+  if (!items.length) { el.innerHTML = '<p style="color:var(--muted)">No uploads yet.</p>'; return; }
+  el.innerHTML = items.map(i => `
+    <div class="h-item">
+      <div><div class="h-name">${esc(i.filename||'unknown')}</div>
+      <div class="h-date">${new Date(i.at).toLocaleString()}</div></div>
+      <div class="chips">
+        <span class="chip cg">+${i.added} added</span>
+        <span class="chip cb">↑${i.updated} updated</span>
+        <span class="chip cgr">${i.skipped} skipped</span>
+        <span class="chip co">${i.archived} archived</span>
+        ${i.errors ? `<span class="chip cr">${i.errors} errors</span>` : ''}
+        <span class="chip cgr">${i.total} rows</span>
+      </div>
+    </div>`).join('');
+}
+
+// ══════════════════════════════════════════════
+//  DOWNLOAD / EXPORT
+// ══════════════════════════════════════════════
+const EXPORT_TYPES = [
+  { key: 'incident',        label: 'Incidents'       },
+  { key: 'problem',         label: 'Problems'        },
+  { key: 'change',          label: 'Changes'         },
+  { key: 'service_request', label: 'Service Requests'},
+];
+
+// Columns exported per sheet — order matters
+const EXPORT_COLS = [
+  { h: 'Ticket ID',        f: t => t.ticket_id        || '' },
+  { h: 'Title',            f: t => t.title             || '' },
+  { h: 'Priority',         f: t => t.priority          || '' },
+  { h: 'Excel Status',     f: t => t.status            || '' },
+  { h: 'Manual Status',    f: t => t.manual_status     || '' },
+  { h: 'Assigned To',      f: t => t.assigned_to       || '' },
+  { h: 'Short Description',f: t => t.short_description || '' },
+  { h: 'Category',         f: t => t.category          || '' },
+  { h: 'Created Date',     f: t => t.created_date      || '' },
+  { h: 'Last Updated',     f: t => t.last_updated      || '' },
+  { h: 'ETA',              f: t => t.eta               || '' },
+  { h: 'Aging (Days)',     f: t => { const d = calcAgeDays(t.created_date || t.imported_at); return d !== null ? d : ''; } },
+  { h: 'Resolved Date',    f: t => t.resolved_date     || '' },
+  { h: 'Archived At',      f: t => t.archived_at       || '' },
+  { h: 'Status',           f: t => t.is_resolved ? 'Resolved' : 'Active' },
+  { h: 'Latest Comment',   f: t => (t.comments && t.comments.length) ? t.comments[0].text : '' },
+  { h: 'Comment Count',    f: t => (t.comments || []).length },
+  { h: 'Description',      f: t => t.description       || '' },
+];
+
+function getExportScope() {
+  const sel = document.querySelector('input[name="dl-scope"]:checked');
+  return sel ? sel.value : 'all';
+}
+
+function renderDownloadCounts() {
+  const scope = getExportScope();
+  const el = document.getElementById('dl-counts');
+  if (!el) return;
+  const lines = EXPORT_TYPES.map(({ key, label }) => {
+    const all = Object.values(lsGet(typeLsKey(key, 'tickets')) || {});
+    const filtered = all.filter(t => scope === 'all' ? true : scope === 'active' ? !t.is_resolved : t.is_resolved);
+    return `<span style="margin-right:16px">${label}: <strong>${filtered.length}</strong></span>`;
+  });
+  const total = EXPORT_TYPES.reduce((sum, { key }) => {
+    const all = Object.values(lsGet(typeLsKey(key, 'tickets')) || {});
+    return sum + all.filter(t => scope === 'all' ? true : scope === 'active' ? !t.is_resolved : t.is_resolved).length;
+  }, 0);
+  el.innerHTML = lines.join('') + `<br/><span style="margin-top:6px;display:inline-block;font-weight:700;color:var(--text)">Total rows: ${total}</span>`;
+}
+
+// Update counts live when scope radio changes
+document.addEventListener('change', e => {
+  if (e.target.name === 'dl-scope') renderDownloadCounts();
+});
+
+function exportToExcel() {
+  const scope = getExportScope();
+  const now   = new Date();
+  const stamp = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}`;
+  const filename = `TicketTracker_Export_${stamp}.xlsx`;
+
+  const wb = XLSX.utils.book_new();
+
+  let totalRows = 0;
+
+  EXPORT_TYPES.forEach(({ key, label }) => {
+    const all = Object.values(lsGet(typeLsKey(key, 'tickets')) || {});
+    const tickets = all
+      .filter(t => scope === 'all' ? true : scope === 'active' ? !t.is_resolved : t.is_resolved)
+      .sort((a, b) => (a.ticket_id || '').localeCompare(b.ticket_id || ''));
+
+    // Build rows: header first, then data
+    const header = EXPORT_COLS.map(c => c.h);
+    const rows   = tickets.map(t => EXPORT_COLS.map(c => c.f(t)));
+
+    const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+
+    // Column widths — auto-size by max content length
+    const colWidths = header.map((h, ci) => {
+      const maxLen = Math.max(
+        h.length,
+        ...rows.map(r => String(r[ci] ?? '').length)
+      );
+      return { wch: Math.min(Math.max(maxLen + 2, 10), 60) };
+    });
+    ws['!cols'] = colWidths;
+
+    // Freeze top row
+    ws['!freeze'] = { xSplit: 0, ySplit: 1 };
+
+    // Sheet name max 31 chars (Excel limit)
+    const sheetName = label.slice(0, 31);
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    totalRows += tickets.length;
+  });
+
+  if (totalRows === 0) {
+    toast('No tickets to export for the selected scope', 'err');
+    return;
+  }
+
+  XLSX.writeFile(wb, filename);
+  toast(`✅ Downloaded ${filename} (${totalRows} rows across 4 sheets)`, 'ok');
+}
+
+// ══════════════════════════════════════════════
+//  UTILITIES
+// ══════════════════════════════════════════════
+function setStatus(html) { document.getElementById('upload-status').innerHTML = html; }
+
+function refreshNavCount(n) {
+  if (n === undefined) n = Object.values(getTickets()).filter(t => !t.is_resolved).length;
+  document.getElementById('nav-count').textContent = n;
+  updateTypeTabCounts();
+}
+
+function clearAll() {
+  localStorage.removeItem(LS.TICKETS);
+  localStorage.removeItem(LS.HISTORY);
+  toast(`All ${TICKET_TYPES[currentType].label} data cleared`, 'ok');
+  renderDashboard(); renderHistory();
+  updateTypeTabCounts();
+}
+
+function esc(s) {
+  if (s == null) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+function fmtD(s) {
+  if (!s) return '—';
+  const d = new Date(s);
+  if (isNaN(d)) return esc(s);
+  return d.toLocaleDateString(undefined, {year:'numeric',month:'short',day:'numeric'});
+}
+
+// Returns age in full days between a date string and today
+function calcAgeDays(dateStr) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  if (isNaN(d)) return null;
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  d.setHours(0,0,0,0);
+  return Math.floor((today - d) / 86400000);
+}
+
+// ── Per-type aging thresholds ──
+// Each band: { key, label, shortLabel, color, bg, textColor, max (null = no upper bound) }
+const AGING_CONFIG = {
+  // Default (Incidents, Problems, Service Requests): 0-6 / 7-14 / 15-30 / 30+
+  _default: [
+    { key:'green',  label:'Fresh (0–6 days)',     shortLabel:'Fresh (0–6d)',    color:'#16a34a', bg:'#f0fdf4', textColor:'#166534', max:6  },
+    { key:'yellow', label:'Ageing (7–14 days)',   shortLabel:'Ageing (7–14d)', color:'#ca8a04', bg:'#fefce8', textColor:'#92400e', max:14 },
+    { key:'orange', label:'Old (15–30 days)',      shortLabel:'Old (15–30d)',   color:'#ea580c', bg:'#fff7ed', textColor:'#c2410c', max:30 },
+    { key:'red',    label:'Critical Age (30+ days)',shortLabel:'Critical (30+d)',color:'#dc2626', bg:'#fef2f2', textColor:'#b91c1c', max:null },
+  ],
+  // Change tickets: 0-30 / 31-60 / 61-90 / 90+
+  change: [
+    { key:'green',  label:'Fresh (0–30 days)',      shortLabel:'Fresh (0–30d)',    color:'#16a34a', bg:'#f0fdf4', textColor:'#166534', max:30  },
+    { key:'yellow', label:'Ageing (31–60 days)',    shortLabel:'Ageing (31–60d)', color:'#ca8a04', bg:'#fefce8', textColor:'#92400e', max:60  },
+    { key:'orange', label:'Old (61–90 days)',        shortLabel:'Old (61–90d)',    color:'#ea580c', bg:'#fff7ed', textColor:'#c2410c', max:90  },
+    { key:'red',    label:'Critical Age (90+ days)',shortLabel:'Critical (90+d)', color:'#dc2626', bg:'#fef2f2', textColor:'#b91c1c', max:null },
+  ],
+};
+
+function getAgingConfig() {
+  return AGING_CONFIG[currentType] || AGING_CONFIG._default;
+}
+
+// Returns the band key ('green'|'yellow'|'orange'|'red') for a given age in days
+function ageBandFromDays(days) {
+  if (days === null) return 'none';
+  const cfg = getAgingConfig();
+  for (const band of cfg) {
+    if (band.max === null || days <= band.max) return band.key;
+  }
+  return 'red';
+}
+
+// Coloured badge — respects current type's thresholds
+function agingBadge(dateStr) {
+  const days = calcAgeDays(dateStr);
+  if (days === null) return '<span style="color:var(--muted)">—</span>';
+  const cfg = getAgingConfig();
+  const band = cfg.find(b => b.max === null || days <= b.max) || cfg[cfg.length - 1];
+  return `<span style="display:inline-block;padding:2px 9px;border-radius:10px;font-size:12px;font-weight:700;background:${band.bg};color:${band.textColor}">${days}d</span>`;
+}
+
+// Short format: "15 Jan, 10:32" — used in status history entries
+function fmtDShort(s) {
+  if (!s) return '';
+  const d = new Date(s);
+  if (isNaN(d)) return esc(s);
+  return d.toLocaleDateString(undefined, {day:'numeric',month:'short'}) + ' ' +
+    d.toLocaleTimeString(undefined, {hour:'2-digit',minute:'2-digit'});
+}
+
+function priB(p) {
+  if (!p) return '<span class="bp pd">—</span>';
+  const m = {critical:'pc',urgent:'pu',high:'ph',medium:'pm',moderate:'pm',low:'pl'};
+  const c = m[(p||'').toLowerCase()] || 'pd';
+  return `<span class="bp ${c}">${esc(p)}</span>`;
+}
+
+function statB(s) {
+  if (!s) return '<span class="bs sd2">—</span>';
+  const k = (s||'').toLowerCase().replace(/[\s_\-]/g,'');
+  const m = {open:'so',new:'sn',inprogress:'sip',pending:'sp',onhold:'sh',
+    resolved:'sr',closed:'sc',done:'sd',completed:'sd',fixed:'sd'};
+  const c = m[k] || 'sd2';
+  return `<span class="bs ${c}">${esc(s)}</span>`;
+}
+
+// ══════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════
+// Hide app until logged in, then show login screen
+document.getElementById('app').style.visibility = 'hidden';
+
+const _existingRole = getRole();
+if (_existingRole) {
+  // Already logged in this session (e.g. page refresh)
+  document.getElementById('login-screen').style.display = 'none';
+  applyRole();
+  switchType('incident');
+} else {
+  document.getElementById('login-screen').style.display = 'flex';
+  setTimeout(() => document.getElementById('login-pin').focus(), 100);
+}
+</script>
+</body>
+</html>

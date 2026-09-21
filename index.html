@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Team Ticket Tracker</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #f0f2f5;
+    --surface: #ffffff;
+    --border: #dde1e7;
+    --text: #1c1f26;
+    --muted: #6b7280;
+    --accent: #2563eb;
+    --accent-light: #eff6ff;
+    --green: #16a34a;
+    --green-light: #f0fdf4;
+    --red: #dc2626;
+    --red-light: #fef2f2;
+    --orange: #d97706;
+    --orange-light: #fffbeb;
+    --purple: #7c3aed;
+    --radius: 8px;
+    --shadow: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.04);
+  }
+  body { font-family: -apple-system,"Segoe UI",system-ui,sans-serif; background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; }
+  a { color: var(--accent); text-decoration: none; }
+
+  /* ── Layout ── */
+  #app { display: flex; min-height: 100vh; }
+  nav { width: 220px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 0; position: sticky; top: 0; height: 100vh; overflow: hidden; }
+  .role-switcher { padding: 10px 14px 14px; border-top: 1px solid var(--border); margin-top: auto; }
+  .role-switcher label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-bottom: 5px; font-weight: 600; }
+  .role-switcher select { width: 100%; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; background: var(--bg); color: var(--text); outline: none; }
+  .role-badge { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 11px; font-weight: 600; margin-left: 6px; vertical-align: middle; }
+  .role-admin   { background: #fee2e2; color: #b91c1c; }
+  .role-manager { background: #dbeafe; color: #1d4ed8; }
+  .role-viewer  { background: #f3f4f6; color: #374151; }
+  .nav-brand { padding: 20px 18px 14px; font-weight: 700; font-size: 15px; color: var(--accent); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
+  .nav-brand svg { flex-shrink: 0; }
+  .nav-links { flex: 1; padding: 10px 0; }
+  .nav-link { display: flex; align-items: center; gap: 10px; padding: 9px 18px; color: var(--muted); cursor: pointer; border-left: 3px solid transparent; transition: all .15s; font-size: 13.5px; }
+  .nav-link:hover { background: var(--bg); color: var(--text); }
+  .nav-link.active { color: var(--accent); background: var(--accent-light); border-left-color: var(--accent); font-weight: 600; }
+  .nav-link .badge { margin-left: auto; background: var(--accent); color: #fff; border-radius: 10px; padding: 1px 7px; font-size: 11px; }
+
+  main { flex: 1; padding: 28px 32px; max-width: 1200px; }
+
+  /* ── Pages ── */
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* ── Page header ── */
+  .page-header { margin-bottom: 24px; }
+  .page-header h1 { font-size: 20px; font-weight: 700; }
+  .page-header p { color: var(--muted); margin-top: 3px; }
+
+  /* ── Cards ── */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); }
+  .card-title { font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-bottom: 12px; }
+
+  /* ── Stat grid ── */
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin-bottom: 24px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--shadow); }
+  .stat-card .value { font-size: 28px; font-weight: 700; line-height: 1; margin-bottom: 4px; }
+  .stat-card .label { color: var(--muted); font-size: 12.5px; }
+  .stat-card.blue .value { color: var(--accent); }
+  .stat-card.green .value { color: var(--green); }
+  .stat-card.orange .value { color: var(--orange); }
+  .stat-card.purple .value { color: var(--purple); }
+
+  /* ── Charts row ── */
+  .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+  .bar-chart { display: flex; flex-direction: column; gap: 8px; }
+  .bar-row { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+  .bar-label { width: 110px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; }
+  .bar-track { flex: 1; background: var(--bg); border-radius: 4px; height: 14px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 4px; background: var(--accent); transition: width .4s; }
+  .bar-count { width: 32px; text-align: right; color: var(--muted); }
+
+  /* ── Upload zone ── */
+  .upload-zone { border: 2px dashed var(--border); border-radius: var(--radius); padding: 40px; text-align: center; cursor: pointer; transition: all .2s; background: var(--surface); }
+  .upload-zone:hover, .upload-zone.drag { border-color: var(--accent); background: var(--accent-light); }
+  .upload-zone svg { color: var(--muted); margin-bottom: 12px; }
+  .upload-zone p { color: var(--muted); }
+  .upload-zone strong { color: var(--text); }
+  #file-input { display: none; }
+
+  /* ── Buttons ── */
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; font-size: 13.5px; font-weight: 500; transition: opacity .15s; }
+  .btn:hover { opacity: .85; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-secondary { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
+  .btn-danger { background: var(--red); color: #fff; }
+  .btn-sm { padding: 5px 11px; font-size: 12.5px; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+
+  /* ── Search/filter bar ── */
+  .toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+  .search-input { flex: 1; min-width: 200px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 13.5px; outline: none; transition: border-color .15s; }
+  .search-input:focus { border-color: var(--accent); }
+  select.filter { padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13.5px; background: var(--surface); outline: none; }
+
+  /* ── Table ── */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th { text-align: left; padding: 10px 12px; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); background: var(--bg); border-bottom: 1px solid var(--border); white-space: nowrap; }
+  td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--accent-light); }
+  .empty-row td { text-align: center; color: var(--muted); padding: 32px; }
+
+  /* ── Priority badge ── */
+  .badge-priority { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11.5px; font-weight: 600; }
+  .p-critical, .p-urgent { background: #fee2e2; color: #b91c1c; }
+  .p-high { background: #ffedd5; color: #c2410c; }
+  .p-medium, .p-moderate { background: #fef9c3; color: #92400e; }
+  .p-low { background: #dcfce7; color: #166534; }
+  .p-default { background: #f3f4f6; color: #374151; }
+
+  /* ── Status badge ── */
+  .badge-status { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11.5px; font-weight: 600; }
+  .s-open, .s-new { background: #dbeafe; color: #1d4ed8; }
+  .s-inprogress, .s-in-progress { background: #fef3c7; color: #92400e; }
+  .s-pending, .s-onhold { background: #f3e8ff; color: #6d28d9; }
+  .s-resolved, .s-closed, .s-done, .s-completed { background: #d1fae5; color: #065f46; }
+  .s-default { background: #f3f4f6; color: #374151; }
+
+  /* ── Modal ── */
+  .modal-backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 100; align-items: center; justify-content: center; }
+  .modal-backdrop.open { display: flex; }
+  .modal { background: var(--surface); border-radius: var(--radius); padding: 28px; width: 560px; max-width: 95vw; max-height: 90vh; overflow-y: auto; position: relative; box-shadow: 0 20px 60px rgba(0,0,0,.15); }
+  .modal-title { font-size: 17px; font-weight: 700; margin-bottom: 18px; }
+  .modal-close { position: absolute; top: 16px; right: 18px; background: none; border: none; cursor: pointer; font-size: 18px; color: var(--muted); }
+
+  /* ── Summary cards ── */
+  .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+  .summary-item { border-radius: 6px; padding: 14px 16px; }
+  .summary-item .s-val { font-size: 24px; font-weight: 700; line-height: 1; }
+  .summary-item .s-lbl { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .si-added { background: var(--green-light); } .si-added .s-val { color: var(--green); }
+  .si-updated { background: var(--accent-light); } .si-updated .s-val { color: var(--accent); }
+  .si-skipped { background: #f9fafb; } .si-skipped .s-val { color: var(--muted); }
+  .si-archived { background: var(--orange-light); } .si-archived .s-val { color: var(--orange); }
+  .si-errors { background: var(--red-light); } .si-errors .s-val { color: var(--red); }
+  .si-total { background: #f3e8ff; } .si-total .s-val { color: var(--purple); }
+
+  /* ── Column mapper ── */
+  .mapper-table { width: 100%; font-size: 13px; margin-bottom: 20px; }
+  .mapper-table th { padding: 8px 10px; background: var(--bg); color: var(--muted); font-weight: 600; font-size: 12px; }
+  .mapper-table td { padding: 7px 10px; border-bottom: 1px solid var(--border); }
+  .mapper-table select { width: 100%; padding: 5px 8px; border: 1px solid var(--border); border-radius: 5px; font-size: 13px; }
+
+  /* ── Upload history ── */
+  .history-list { display: flex; flex-direction: column; gap: 10px; }
+  .history-item { background: var(--bg); border-radius: 6px; padding: 12px 16px; display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px; }
+  .history-item .h-name { font-weight: 600; }
+  .history-item .h-date { color: var(--muted); font-size: 12px; }
+  .history-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip { font-size: 11.5px; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+  .chip-green { background: var(--green-light); color: var(--green); }
+  .chip-blue { background: var(--accent-light); color: var(--accent); }
+  .chip-orange { background: var(--orange-light); color: var(--orange); }
+  .chip-red { background: var(--red-light); color: var(--red); }
+  .chip-gray { background: #f3f4f6; color: var(--muted); }
+
+  /* ── Spinner ── */
+  .spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Toast ── */
+  #toast { position: fixed; bottom: 24px; right: 24px; background: #1c1f26; color: #fff; padding: 12px 18px; border-radius: 8px; font-size: 13.5px; transform: translateY(80px); opacity: 0; transition: all .3s; z-index: 200; max-width: 340px; }
+  #toast.show { transform: translateY(0); opacity: 1; }
+  #toast.error { background: var(--red); }
+  #toast.success { background: var(--green); }
+
+  /* ── Detail panel ── */
+  .detail-row { display: flex; gap: 8px; margin-bottom: 10px; }
+  .detail-label { width: 120px; flex-shrink: 0; font-weight: 600; color: var(--muted); font-size: 12.5px; padding-top: 1px; }
+  .detail-value { flex: 1; }
+  .detail-input { width: 100%; padding: 6px 10px; border: 1px solid var(--border); border-radius: 5px; font-size: 13.5px; }
+
+  @media (max-width: 768px) {
+    nav { width: 56px; }
+    .nav-brand span, .nav-link span, .nav-link .badge { display: none; }
+    .nav-link { justify-content: center; padding: 12px; }
+    main { padding: 18px 14px; }
+    .charts-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- ── Sidebar ── -->
+  <nav>
+    <div class="nav-brand">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h5"/></svg>
+      <span>Ticket Tracker</span>
+    </div>
+    <div class="nav-links">
+      <div class="nav-link active" data-page="dashboard">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        <span>Dashboard</span>
+      </div>
+      <div class="nav-link" data-page="active">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        <span>Active Tickets</span>
+        <span class="badge" id="nav-active-count">0</span>
+      </div>
+      <div class="nav-link" data-page="resolved">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        <span>Resolved</span>
+      </div>
+      <div class="nav-link" data-page="upload">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <span>Upload Excel</span>
+      </div>
+      <div class="nav-link" data-page="history">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span>Upload History</span>
+      </div>
+    </div>
+    <!-- Role Switcher -->
+    <div class="role-switcher">
+      <label>Viewing as</label>
+      <select id="role-select" onchange="applyRole(this.value)">
+        <option value="admin">Admin</option>
+        <option value="manager">Manager</option>
+        <option value="viewer">Viewer</option>
+      </select>
+    </div>
+  </nav>
+
+  <!-- ── Main ── -->
+  <main>
+
+    <!-- Dashboard -->
+    <div class="page active" id="page-dashboard">
+      <div class="page-header">
+        <h1>Dashboard</h1>
+        <p>Team workload overview &amp; ticket statistics</p>
+      </div>
+      <div class="stat-grid" id="stat-grid">
+        <div class="stat-card blue"><div class="value" id="stat-active">—</div><div class="label">Active Tickets</div></div>
+        <div class="stat-card green"><div class="value" id="stat-resolved">—</div><div class="label">Resolved / Archived</div></div>
+        <div class="stat-card orange"><div class="value" id="stat-high">—</div><div class="label">High / Critical</div></div>
+        <div class="stat-card purple"><div class="value" id="stat-unassigned">—</div><div class="label">Unassigned</div></div>
+      </div>
+      <div class="charts-row">
+        <div class="card">
+          <div class="card-title">By Priority</div>
+          <div class="bar-chart" id="chart-priority"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">By Status</div>
+          <div class="bar-chart" id="chart-status"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Tickets by Assignee</div>
+        <div class="bar-chart" id="chart-assignee"></div>
+      </div>
+      <div id="last-upload-info" style="margin-top:16px;color:var(--muted);font-size:12.5px;"></div>
+    </div>
+
+    <!-- Active Tickets -->
+    <div class="page" id="page-active">
+      <div class="page-header">
+        <h1>Active Tickets</h1>
+        <p>All open, in-progress, and pending tickets</p>
+      </div>
+      <div class="toolbar">
+        <input class="search-input" id="active-search" type="text" placeholder="Search by ID, title, or assignee…" />
+        <select class="filter" id="active-priority-filter">
+          <option value="">All Priorities</option>
+          <option>Critical</option><option>Urgent</option><option>High</option>
+          <option>Medium</option><option>Low</option>
+        </select>
+        <select class="filter" id="active-assignee-filter"><option value="">All Assignees</option></select>
+        <button class="btn btn-secondary btn-sm" onclick="loadActiveTickets()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          Refresh
+        </button>
+      </div>
+      <div class="card table-wrap">
+        <table id="active-table">
+          <thead><tr>
+            <th>Ticket ID</th><th>Title</th><th>Priority</th><th>Status</th>
+            <th>Assigned To</th><th>Category</th><th>Created</th>
+            <th class="col-percentage">% Complete</th>
+            <th>Actions</th>
+          </tr></thead>
+          <tbody id="active-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Resolved -->
+    <div class="page" id="page-resolved">
+      <div class="page-header">
+        <h1>Resolved / Archived Tickets</h1>
+        <p>Tickets that have been resolved or closed</p>
+      </div>
+      <div class="toolbar">
+        <input class="search-input" id="resolved-search" type="text" placeholder="Search resolved tickets…" />
+        <button class="btn btn-secondary btn-sm" onclick="loadResolvedTickets()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          Refresh
+        </button>
+      </div>
+      <div class="card table-wrap">
+        <table>
+          <thead><tr>
+            <th>Ticket ID</th><th>Title</th><th>Priority</th><th>Status</th>
+            <th>Assigned To</th><th>Archived At</th><th>Actions</th>
+          </tr></thead>
+          <tbody id="resolved-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Upload -->
+    <div class="page" id="page-upload">
+      <div class="page-header">
+        <h1>Upload Excel File</h1>
+        <p>Upload your daily ticket export (.xlsx or .xls)</p>
+      </div>
+      <div class="card" style="margin-bottom:20px;">
+        <div class="upload-zone" id="upload-zone">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          <p><strong>Click to select</strong> or drag &amp; drop your Excel file here</p>
+          <p style="margin-top:6px;font-size:12px;">Supports .xlsx and .xls files up to 16 MB</p>
+          <input type="file" id="file-input" accept=".xlsx,.xls" />
+        </div>
+        <div id="selected-file" style="display:none; margin-top:14px; padding:12px; background:var(--accent-light); border-radius:6px; display:none; align-items:center; gap:10px;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          <span id="selected-filename" style="font-weight:600;"></span>
+          <button class="btn btn-secondary btn-sm" style="margin-left:auto;" onclick="clearFile()">Remove</button>
+        </div>
+      </div>
+      <div id="upload-actions" style="display:none; gap:10px; flex-wrap:wrap;">
+        <button class="btn btn-primary" id="btn-preview" onclick="previewHeaders()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          Preview &amp; Map Columns
+        </button>
+        <button class="btn btn-secondary" id="btn-upload-direct" onclick="uploadDirect()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Upload with Saved Mapping
+        </button>
+      </div>
+      <div id="upload-status" style="margin-top:16px;"></div>
+    </div>
+
+    <!-- History -->
+    <div class="page" id="page-history">
+      <div class="page-header">
+        <h1>Upload History</h1>
+        <p>Last 20 uploads with import summaries</p>
+      </div>
+      <div class="history-list" id="history-list"></div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ── Column Mapping Modal ── -->
+<div class="modal-backdrop" id="modal-mapper">
+  <div class="modal">
+    <div class="modal-title">Map Excel Columns</div>
+    <button class="modal-close" onclick="closeMapper()">✕</button>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:14px;">
+      Map each Excel column header to a field in the system.<br>
+      <strong>ticket_id</strong> is required. Set unused columns to <em>— Skip —</em>.
+    </p>
+    <table class="mapper-table">
+      <thead><tr><th>Excel Column</th><th>Map to Field</th></tr></thead>
+      <tbody id="mapper-tbody"></tbody>
+    </table>
+    <div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;">
+      <button class="btn btn-secondary" onclick="closeMapper()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveMappingAndUpload()">
+        Save Mapping &amp; Upload
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Summary Modal ── -->
+<div class="modal-backdrop" id="modal-summary">
+  <div class="modal">
+    <div class="modal-title">✅ Upload Complete</div>
+    <button class="modal-close" onclick="closeSummary()">✕</button>
+    <div class="summary-grid" id="summary-grid"></div>
+    <p style="color:var(--muted);font-size:12.5px;margin-bottom:16px;" id="summary-note"></p>
+    <div style="text-align:right;">
+      <button class="btn btn-primary" onclick="closeSummary()">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Ticket Detail Modal ── -->
+<div class="modal-backdrop" id="modal-ticket">
+  <div class="modal">
+    <div class="modal-title" id="detail-title">Ticket Detail</div>
+    <button class="modal-close" onclick="closeTicketDetail()">✕</button>
+    <div id="detail-body"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap;">
+      <button class="btn btn-secondary" onclick="closeTicketDetail()">Close</button>
+      <button class="btn btn-primary" id="btn-save-ticket" onclick="saveTicketDetail()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Toast ── -->
+<div id="toast"></div>
+
+<script>
+// ── State ──
+let selectedFile = null;
+let previewHeaders = null; // renamed below
+let currentMapping = {};
+let currentUploadFilename = '';
+let editingTicketId = null;
+let currentRole = 'admin'; // 'admin' | 'manager' | 'viewer'
+
+const CORE_FIELDS = [
+  'ticket_id','title','description','created_date',
+  'priority','assigned_to','category','status','last_updated','percentage'
+];
+
+// ── Role ──
+function applyRole(role) {
+  currentRole = role;
+  const isAdmin = role === 'admin';
+  // Toggle percentage column header visibility
+  document.querySelectorAll('.col-percentage').forEach(el => {
+    el.style.display = isAdmin ? '' : 'none';
+  });
+  // Re-render active table to reflect column visibility
+  loadActiveTickets();
+  // Update ticket detail if open
+  const modal = document.getElementById('modal-ticket');
+  if (modal.classList.contains('open') && editingTicketId) {
+    openTicketDetail(editingTicketId);
+  }
+}
+
+// ── Navigation ──
+document.querySelectorAll('.nav-link').forEach(link => {
+  link.addEventListener('click', () => {
+    document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    link.classList.add('active');
+    const page = link.dataset.page;
+    document.getElementById('page-' + page).classList.add('active');
+    if (page === 'dashboard') loadStats();
+    if (page === 'active') loadActiveTickets();
+    if (page === 'resolved') loadResolvedTickets();
+    if (page === 'history') loadHistory();
+  });
+});
+
+// ── Toast ──
+let toastTimer;
+function showToast(msg, type = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show ' + type;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.className = ''; }, 3800);
+}
+
+// ── Drag & Drop Upload ──
+const zone = document.getElementById('upload-zone');
+const fileInput = document.getElementById('file-input');
+
+zone.addEventListener('click', () => fileInput.click());
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('drag'));
+zone.addEventListener('drop', e => {
+  e.preventDefault(); zone.classList.remove('drag');
+  const file = e.dataTransfer.files[0];
+  if (file) setFile(file);
+});
+fileInput.addEventListener('change', e => {
+  if (e.target.files[0]) setFile(e.target.files[0]);
+});
+
+function setFile(file) {
+  if (!file.name.match(/\.(xlsx|xls)$/i)) { showToast('Please select an .xlsx or .xls file', 'error'); return; }
+  selectedFile = file;
+  document.getElementById('selected-filename').textContent = file.name;
+  const sf = document.getElementById('selected-file');
+  sf.style.display = 'flex';
+  document.getElementById('upload-actions').style.display = 'flex';
+}
+
+function clearFile() {
+  selectedFile = null;
+  fileInput.value = '';
+  document.getElementById('selected-file').style.display = 'none';
+  document.getElementById('upload-actions').style.display = 'none';
+  document.getElementById('upload-status').innerHTML = '';
+}
+
+// ── Preview Headers (step 1: show mapper) ──
+async function doPreviewHeaders() {
+  if (!selectedFile) return;
+  setUploadStatus('<span class="spinner"></span> Reading file headers…');
+  const fd = new FormData();
+  fd.append('file', selectedFile);
+  try {
+    const res = await fetch('/api/preview-headers', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok) { showToast(data.error || 'Error reading file', 'error'); setUploadStatus(''); return; }
+    openMapper(data.headers, data.suggested_mapping, data.filename);
+    setUploadStatus('');
+    currentUploadFilename = data.filename;
+  } catch(e) { showToast('Network error', 'error'); setUploadStatus(''); }
+}
+
+// Rename to avoid conflict with HTML onclick
+window.previewHeaders = doPreviewHeaders;
+
+function setUploadStatus(html) {
+  document.getElementById('upload-status').innerHTML = html;
+}
+
+// ── Upload Direct (using saved mapping) ──
+async function uploadDirect() {
+  if (!selectedFile) return;
+  setUploadStatus('<span class="spinner"></span> Uploading and importing tickets…');
+  const fd = new FormData();
+  fd.append('file', selectedFile);
+  try {
+    const res = await fetch('/api/upload', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok) {
+      if (data.needs_mapping) {
+        showToast('No mapping saved yet. Please use "Preview & Map Columns" first.', 'error');
+      } else {
+        showToast(data.error || 'Upload failed', 'error');
+      }
+      setUploadStatus('');
+      return;
+    }
+    setUploadStatus('');
+    clearFile();
+    showSummary(data.summary);
+    loadStats();
+    updateNavCount();
+  } catch(e) { showToast('Network error', 'error'); setUploadStatus(''); }
+}
+
+// ── Column Mapper Modal ──
+function openMapper(headers, suggested, filename) {
+  currentUploadFilename = filename;
+  const tbody = document.getElementById('mapper-tbody');
+  tbody.innerHTML = '';
+  headers.forEach(h => {
+    const tr = document.createElement('tr');
+    const opts = ['', ...CORE_FIELDS].map(f =>
+      `<option value="${f}" ${suggested[h] === f ? 'selected' : ''}>${f || '— Skip —'}</option>`
+    ).join('');
+    tr.innerHTML = `<td><strong>${h}</strong></td><td><select data-col="${h}">${opts}</select></td>`;
+    tbody.appendChild(tr);
+  });
+  document.getElementById('modal-mapper').classList.add('open');
+}
+
+function closeMapper() {
+  document.getElementById('modal-mapper').classList.remove('open');
+}
+
+async function saveMappingAndUpload() {
+  const mapping = {};
+  document.querySelectorAll('#mapper-tbody select').forEach(sel => {
+    if (sel.value) mapping[sel.dataset.col] = sel.value;
+  });
+  if (!mapping['__ticket_id_check__'] && !Object.values(mapping).includes('ticket_id')) {
+    showToast('You must map at least one column to "ticket_id"', 'error');
+    return;
+  }
+  closeMapper();
+  setUploadStatus('<span class="spinner"></span> Uploading and importing tickets…');
+  const fd = new FormData();
+  fd.append('file', selectedFile);
+  fd.append('mapping', JSON.stringify(mapping));
+  try {
+    const res = await fetch('/api/upload', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok) { showToast(data.error || 'Upload failed', 'error'); setUploadStatus(''); return; }
+    setUploadStatus('');
+    clearFile();
+    showSummary(data.summary);
+    loadStats();
+    updateNavCount();
+  } catch(e) { showToast('Network error', 'error'); setUploadStatus(''); }
+}
+
+// ── Summary Modal ──
+function showSummary(s) {
+  const items = [
+    { cls: 'si-added',   val: s.added,       lbl: 'New Tickets Added' },
+    { cls: 'si-updated', val: s.updated,     lbl: 'Existing Updated' },
+    { cls: 'si-skipped', val: s.skipped,     lbl: 'Unchanged / Skipped' },
+    { cls: 'si-archived',val: s.archived,    lbl: 'Resolved / Archived' },
+    { cls: 'si-errors',  val: s.errors,      lbl: 'Errors / Invalid Rows' },
+    { cls: 'si-total',   val: s.total_rows,  lbl: 'Total Rows Processed' },
+  ];
+  document.getElementById('summary-grid').innerHTML = items.map(i =>
+    `<div class="summary-item ${i.cls}"><div class="s-val">${i.val}</div><div class="s-lbl">${i.lbl}</div></div>`
+  ).join('');
+  document.getElementById('summary-note').textContent =
+    `Resolved tickets are archived and removed from the active dashboard.`;
+  document.getElementById('modal-summary').classList.add('open');
+}
+
+function closeSummary() {
+  document.getElementById('modal-summary').classList.remove('open');
+}
+
+// ── Stats / Dashboard ──
+async function loadStats() {
+  try {
+    const res = await fetch('/api/stats');
+    const d = await res.json();
+    document.getElementById('stat-active').textContent = d.total_active;
+    document.getElementById('stat-resolved').textContent = d.total_resolved;
+
+    const highCount = (d.by_priority || [])
+      .filter(p => ['critical','urgent','high'].includes(p.priority.toLowerCase()))
+      .reduce((a, p) => a + p.cnt, 0);
+    document.getElementById('stat-high').textContent = highCount;
+
+    const unassigned = (d.by_assignee || []).find(a => a.assigned_to === 'Unassigned');
+    document.getElementById('stat-unassigned').textContent = unassigned ? unassigned.cnt : 0;
+
+    renderBarChart('chart-priority', d.by_priority || [], 'priority', '#2563eb');
+    renderBarChart('chart-status',   d.by_status   || [], 'status',   '#7c3aed');
+    renderBarChart('chart-assignee', d.by_assignee || [], 'assigned_to', '#16a34a');
+
+    if (d.last_upload) {
+      const lu = d.last_upload;
+      const dt = new Date(lu.uploaded_at).toLocaleString();
+      document.getElementById('last-upload-info').textContent =
+        `Last upload: ${lu.filename} on ${dt} — ${lu.added} added, ${lu.updated} updated, ${lu.archived} archived`;
+    }
+    updateNavCount(d.total_active);
+  } catch(e) { console.error(e); }
+}
+
+function renderBarChart(containerId, data, labelField, color) {
+  const container = document.getElementById(containerId);
+  if (!data.length) { container.innerHTML = '<p style="color:var(--muted);font-size:13px;">No data</p>'; return; }
+  const max = Math.max(...data.map(d => d.cnt));
+  container.innerHTML = data.map(item => {
+    const pct = max > 0 ? (item.cnt / max * 100).toFixed(1) : 0;
+    return `<div class="bar-row">
+      <div class="bar-label" title="${item[labelField]}">${item[labelField]}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>
+      <div class="bar-count">${item.cnt}</div>
+    </div>`;
+  }).join('');
+}
+
+function updateNavCount(count) {
+  if (count !== undefined) {
+    document.getElementById('nav-active-count').textContent = count;
+  } else {
+    fetch('/api/stats').then(r => r.json()).then(d => {
+      document.getElementById('nav-active-count').textContent = d.total_active;
+    }).catch(() => {});
+  }
+}
+
+// ── Active Tickets ──
+let activeDebounce;
+async function loadActiveTickets() {
+  const q = document.getElementById('active-search').value.trim();
+  const priority = document.getElementById('active-priority-filter').value;
+  const assigned = document.getElementById('active-assignee-filter').value;
+  const params = new URLSearchParams();
+  if (q) params.set('q', q);
+  if (priority) params.set('priority', priority);
+  if (assigned) params.set('assigned_to', assigned);
+  try {
+    const res = await fetch('/api/tickets?' + params);
+    const tickets = await res.json();
+    renderActiveTable(tickets);
+
+    // Populate assignee filter from results
+    const assignees = [...new Set(tickets.map(t => t.assigned_to).filter(Boolean))].sort();
+    const sel = document.getElementById('active-assignee-filter');
+    const current = sel.value;
+    sel.innerHTML = '<option value="">All Assignees</option>' +
+      assignees.map(a => `<option ${a===current?'selected':''}>${a}</option>`).join('');
+  } catch(e) { console.error(e); }
+}
+
+function renderActiveTable(tickets) {
+  const tbody = document.getElementById('active-tbody');
+  const isAdmin = currentRole === 'admin';
+  // Keep percentage column header in sync
+  document.querySelectorAll('.col-percentage').forEach(el => {
+    el.style.display = isAdmin ? '' : 'none';
+  });
+  const colspan = isAdmin ? 9 : 8;
+  if (!tickets.length) {
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="${colspan}">No active tickets found.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = tickets.map(t => {
+    const pctCell = isAdmin
+      ? `<td class="col-percentage">${esc(t.percentage)||'—'}</td>`
+      : '';
+    return `
+    <tr>
+      <td><strong>${esc(t.ticket_id)}</strong></td>
+      <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(t.title)}">${esc(t.title)||'—'}</td>
+      <td>${priorityBadge(t.priority)}</td>
+      <td>${statusBadge(t.status)}</td>
+      <td>${esc(t.assigned_to)||'—'}</td>
+      <td>${esc(t.category)||'—'}</td>
+      <td>${fmtDate(t.created_date||t.imported_at)}</td>
+      ${pctCell}
+      <td>
+        <button class="btn btn-secondary btn-sm" onclick="openTicketDetail('${esc(t.ticket_id)}')">View</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+document.getElementById('active-search').addEventListener('input', () => {
+  clearTimeout(activeDebounce);
+  activeDebounce = setTimeout(loadActiveTickets, 300);
+});
+document.getElementById('active-priority-filter').addEventListener('change', loadActiveTickets);
+document.getElementById('active-assignee-filter').addEventListener('change', loadActiveTickets);
+
+// ── Resolved Tickets ──
+let resolvedDebounce;
+async function loadResolvedTickets() {
+  const q = document.getElementById('resolved-search').value.trim();
+  const params = new URLSearchParams();
+  if (q) params.set('q', q);
+  try {
+    const res = await fetch('/api/tickets/resolved?' + params);
+    const tickets = await res.json();
+    const tbody = document.getElementById('resolved-tbody');
+    if (!tickets.length) {
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="7">No resolved tickets found.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = tickets.map(t => `
+      <tr>
+        <td><strong>${esc(t.ticket_id)}</strong></td>
+        <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(t.title)||'—'}</td>
+        <td>${priorityBadge(t.priority)}</td>
+        <td>${statusBadge(t.status)}</td>
+        <td>${esc(t.assigned_to)||'—'}</td>
+        <td>${fmtDate(t.archived_at)}</td>
+        <td><button class="btn btn-secondary btn-sm" onclick="openTicketDetail('${esc(t.ticket_id)}')">View</button></td>
+      </tr>
+    `).join('');
+  } catch(e) { console.error(e); }
+}
+
+document.getElementById('resolved-search').addEventListener('input', () => {
+  clearTimeout(resolvedDebounce);
+  resolvedDebounce = setTimeout(loadResolvedTickets, 300);
+});
+
+// ── Ticket Detail Modal ──
+async function openTicketDetail(ticketId) {
+  editingTicketId = ticketId;
+  const res = await fetch('/api/tickets/' + encodeURIComponent(ticketId));
+  const t = await res.json();
+  document.getElementById('detail-title').textContent = `Ticket: ${t.ticket_id}`;
+
+  const isAdmin = currentRole === 'admin';
+  const canEdit = isAdmin && !t.is_resolved;
+
+  const fields = [
+    { lbl: 'Ticket ID',    val: t.ticket_id,   key: null },
+    { lbl: 'Title',        val: t.title,        key: 'title',       input: true },
+    { lbl: 'Status',       val: t.status,       key: 'status',      input: true },
+    { lbl: 'Priority',     val: t.priority,     key: 'priority',    input: true },
+    { lbl: 'Assigned To',  val: t.assigned_to,  key: 'assigned_to', input: true },
+    { lbl: 'Category',     val: t.category,     key: 'category',    input: true },
+    { lbl: 'Created',      val: fmtDate(t.created_date), key: null },
+    { lbl: 'Last Updated', val: t.last_updated, key: 'last_updated',input: true },
+    { lbl: 'Imported At',  val: fmtDate(t.imported_at), key: null },
+    { lbl: 'Archived At',  val: t.archived_at ? fmtDate(t.archived_at) : '—', key: null },
+    { lbl: 'Description',  val: t.description,  key: 'description', textarea: true },
+    ...(isAdmin ? [{ lbl: '% Complete', val: t.percentage, key: 'percentage', input: true }] : []),
+  ];
+
+  document.getElementById('detail-body').innerHTML = fields.map(f => `
+    <div class="detail-row">
+      <div class="detail-label">${f.lbl}</div>
+      <div class="detail-value">
+        ${f.textarea
+          ? (canEdit
+              ? `<textarea class="detail-input" data-key="${f.key}" rows="3" style="resize:vertical;">${esc(f.val||'')}</textarea>`
+              : `<span>${esc(f.val||'—')}</span>`)
+          : f.input
+            ? (canEdit
+                ? `<input class="detail-input" data-key="${f.key}" value="${esc(f.val||'')}" />`
+                : `<span>${esc(f.val||'—')}</span>`)
+            : `<span>${esc(f.val||'—')}</span>`
+        }
+      </div>
+    </div>
+  `).join('');
+
+  // Show/hide save: only admin can save, and only for active tickets
+  document.getElementById('btn-save-ticket').style.display = canEdit ? '' : 'none';
+  document.getElementById('modal-ticket').classList.add('open');
+}
+
+function closeTicketDetail() {
+  document.getElementById('modal-ticket').classList.remove('open');
+  editingTicketId = null;
+}
+
+async function saveTicketDetail() {
+  if (!editingTicketId) return;
+  const updates = {};
+  document.querySelectorAll('#detail-body [data-key]').forEach(el => {
+    if (el.dataset.key) updates[el.dataset.key] = el.value;
+  });
+  try {
+    const res = await fetch('/api/tickets/' + encodeURIComponent(editingTicketId), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    });
+    const d = await res.json();
+    if (!res.ok) { showToast(d.error || 'Save failed', 'error'); return; }
+    showToast('Ticket updated', 'success');
+    closeTicketDetail();
+    loadActiveTickets();
+    loadStats();
+  } catch(e) { showToast('Network error', 'error'); }
+}
+
+// ── Upload History ──
+async function loadHistory() {
+  try {
+    const res = await fetch('/api/upload-history');
+    const items = await res.json();
+    const container = document.getElementById('history-list');
+    if (!items.length) {
+      container.innerHTML = '<p style="color:var(--muted);">No uploads yet.</p>';
+      return;
+    }
+    container.innerHTML = items.map(i => `
+      <div class="history-item">
+        <div>
+          <div class="h-name">${esc(i.filename||'unknown')}</div>
+          <div class="h-date">${new Date(i.uploaded_at).toLocaleString()}</div>
+        </div>
+        <div class="history-chips">
+          <span class="chip chip-green">+${i.added} added</span>
+          <span class="chip chip-blue">↑${i.updated} updated</span>
+          <span class="chip chip-gray">${i.skipped} skipped</span>
+          <span class="chip chip-orange">${i.archived} archived</span>
+          ${i.errors ? `<span class="chip chip-red">${i.errors} errors</span>` : ''}
+          <span class="chip chip-gray">${i.total_rows} rows</span>
+        </div>
+      </div>
+    `).join('');
+  } catch(e) { console.error(e); }
+}
+
+// ── Helpers ──
+function esc(s) {
+  if (s == null) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+function fmtDate(s) {
+  if (!s) return '—';
+  const d = new Date(s);
+  if (isNaN(d)) return esc(s);
+  return d.toLocaleDateString(undefined, { year:'numeric', month:'short', day:'numeric' });
+}
+
+function priorityBadge(p) {
+  if (!p) return '<span class="badge-priority p-default">—</span>';
+  const cls = { critical:'p-critical', urgent:'p-urgent', high:'p-high', medium:'p-medium', moderate:'p-moderate', low:'p-low' }[p.toLowerCase()] || 'p-default';
+  return `<span class="badge-priority ${cls}">${esc(p)}</span>`;
+}
+
+function statusBadge(s) {
+  if (!s) return '<span class="badge-status s-default">—</span>';
+  const key = s.toLowerCase().replace(/[\s_-]/g,'');
+  const cls = { open:'s-open', new:'s-new', inprogress:'s-inprogress', pending:'s-pending',
+    onhold:'s-onhold', resolved:'s-resolved', closed:'s-closed', done:'s-done', completed:'s-completed'
+  }[key] || 's-default';
+  return `<span class="badge-status ${cls}">${esc(s)}</span>`;
+}
+
+// ── Init ──
+loadStats();
+updateNavCount();
+</script>
+</body>
+</html>
